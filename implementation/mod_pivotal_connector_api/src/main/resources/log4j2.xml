@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="warn">
+    <Properties>
+        <Property name="basePath">${sys:user.home}/log/thitsaconnect/pivotal_connector_api</Property>
+        <Property name="fileName">pivotal_connector_api</Property>
+        <Property name="logPattern">%d{yyyy-MM-dd HH:mm:ss}{UTC} %-8level %notEmpty{%X }%t:%class{36}:%L:(%M) - %msg%xEx%n</Property>
+    </Properties>
+
+    <Appenders>
+        <Console name="console" target="SYSTEM_OUT">
+            <ThresholdFilter level="debug" onMatch="ACCEPT" onMismatch="DENY"/>
+            <PatternLayout pattern="${logPattern}"/>
+        </Console>
+
+        <RollingFile name="coreLogger"
+                     fileName="${basePath}/${fileName}.log"
+                     filePattern="${basePath}/${fileName}-%d{yyyy-MM-dd}-%i.log.gz">
+            <PatternLayout pattern="${logPattern}"/>
+            <Policies>
+                <OnStartupTriggeringPolicy/>
+                <TimeBasedTriggeringPolicy interval="1" modulate="true"/>
+                <SizeBasedTriggeringPolicy size="100MB"/>
+            </Policies>
+            <DefaultRolloverStrategy/>
+        </RollingFile>
+    </Appenders>
+
+    <Loggers>
+        <Logger name="com.thitsaworks.mojaloop.coreconnector" level="info" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="coreLogger"/>
+        </Logger>
+
+        <Logger name="org.springframework" level="info"/>
+        <Logger name="org.hibernate" level="info"/>
+        <Logger name="org.apache" level="info"/>
+
+        <Root level="info" additivity="false">
+            <AppenderRef ref="console"/>
+            <AppenderRef ref="coreLogger"/>
+        </Root>
+    </Loggers>
+</Configuration>

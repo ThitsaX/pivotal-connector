@@ -1,0 +1,35 @@
+
+
+# PersonalIdentifierType
+
+## Enum
+
+
+* `PASSPORT` (value: `"PASSPORT"`)
+
+* `NATIONAL_REGISTRATION` (value: `"NATIONAL_REGISTRATION"`)
+
+* `DRIVING_LICENSE` (value: `"DRIVING_LICENSE"`)
+
+* `ALIEN_REGISTRATION` (value: `"ALIEN_REGISTRATION"`)
+
+* `NATIONAL_ID_CARD` (value: `"NATIONAL_ID_CARD"`)
+
+* `EMPLOYER_ID` (value: `"EMPLOYER_ID"`)
+
+* `TAX_ID_NUMBER` (value: `"TAX_ID_NUMBER"`)
+
+* `SENIOR_CITIZENS_CARD` (value: `"SENIOR_CITIZENS_CARD"`)
+
+* `MARRIAGE_CERTIFICATE` (value: `"MARRIAGE_CERTIFICATE"`)
+
+* `HEALTH_CARD` (value: `"HEALTH_CARD"`)
+
+* `VOTERS_ID` (value: `"VOTERS_ID"`)
+
+* `UNITED_NATIONS` (value: `"UNITED_NATIONS"`)
+
+* `OTHER_ID` (value: `"OTHER_ID"`)
+
+
+
