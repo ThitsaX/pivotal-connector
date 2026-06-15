@@ -24,7 +24,7 @@
         <dependency>
             <groupId>com.thitsaworks.mojaloop.coreconnector</groupId>
             <artifactId>mod-fspiop-interface</artifactId>
-            <version>1.0.0</version>
+            <version>${project.version}</version>
         </dependency>
 
         <dependency>
