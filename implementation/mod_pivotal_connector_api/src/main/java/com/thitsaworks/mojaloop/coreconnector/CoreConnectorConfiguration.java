@@ -89,8 +89,6 @@ public class CoreConnectorConfiguration {
 
         private final int redisTtlSeconds;
 
-        private final String feeEngineEndpoint;
-
         private final BigDecimal transactionAmountLimit;
 
         private final int sdkConnectorPortNo;
@@ -122,7 +120,6 @@ public class CoreConnectorConfiguration {
             this.minimumValue = propBigDecimal("minimumValue", new BigDecimal("0.01"));
             this.redisUrl = prop("redisUrl", "redis://localhost:7379");
             this.redisTtlSeconds = propInt("redisTtlSeconds", 1200);
-            this.feeEngineEndpoint = prop("feeEngineEndpoint", "http://localhost:8081/");
             this.transactionAmountLimit = propBigDecimal("transactionAmountLimit", BigDecimal.ZERO);
             this.sdkConnectorPortNo = propInt("sdkConnectorPortNo", 8080);
         }
