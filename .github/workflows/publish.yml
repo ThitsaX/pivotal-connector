@@ -1,22 +1,20 @@
-name: Publish GitHub Package
+name: Publish Maven Package
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
-  release:
+  publish:
     runs-on: ubuntu-latest
-
-    permissions:
-      contents: write
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.release.tag_name }}
 
       - uses: actions/setup-java@v4
         with:
@@ -27,9 +25,8 @@ jobs:
           server-password: GITHUB_TOKEN
           cache: maven
 
-      - name: Publish to GitHub Packages
-        run: mvn --batch-mode -Drevision="${RELEASE_VERSION#v}" clean deploy
+      - name: Publish package
+        run: mvn --batch-mode -Drevision="${GITHUB_REF_NAME#v}" deploy
         env:
-          RELEASE_VERSION: ${{ github.event.release.tag_name }}
           GITHUB_ACTOR: ${{ github.actor }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
