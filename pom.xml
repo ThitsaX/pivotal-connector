@@ -16,7 +16,7 @@
         <repository>
             <id>github</id>
             <name>GitHub Packages</name>
-            <url>https://maven.pkg.github.com/ThitsaX/pivotal-java-connector</url>
+            <url>https://maven.pkg.github.com/thitsax/pivotal-java-connector</url>
         </repository>
     </distributionManagement>
 
