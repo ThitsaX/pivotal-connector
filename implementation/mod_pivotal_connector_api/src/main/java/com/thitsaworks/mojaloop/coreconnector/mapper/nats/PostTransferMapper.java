@@ -36,8 +36,8 @@ public class PostTransferMapper {
         ReservationForTransfer.Quote quote = new ReservationForTransfer.Quote();
         if (transfersPostRequest.getAmount().getAmount() != null &&
                 !transfersPostRequest.getAmount().getAmount().isBlank()) {
-            quote.setPayeeReceiveAmount(new BigDecimal(String.valueOf(agreement.payeeReceiveAmount())));
-            quote.setTransferAmount(new BigDecimal(String.valueOf(agreement.transferAmount())));
+            quote.setPayeeReceiveAmount(new BigDecimal(agreement.payeeReceiveAmount().getAmount()));
+            quote.setTransferAmount(new BigDecimal(agreement.transferAmount().getAmount()));
         }
         request.setQuote(quote);
         request.setQuoteRequestExtensions(agreement.extensionList());
@@ -48,3 +48,5 @@ public class PostTransferMapper {
 
     }
 }
+
+
