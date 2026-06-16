@@ -29,9 +29,6 @@ public class ReservationForTransfer {
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class Request implements Serializable {
 
-        @JsonProperty("homeR2PTransactionId")
-        private String homeR2PTransactionId;
-
         @NotNull
         @JsonProperty("amount")
         private String amount;

@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.mojaloop.ErrorCode;
-import com.thitsaworks.mojaloop.coreconnector.component.mojaloop.FspParty;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformation;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Money;
@@ -16,6 +15,7 @@ import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.I
 import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.PendingTransfer;
 import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.PendingTransfersStore;
 import com.thitsaworks.mojaloop.coreconnector.logging.MdcExtractors;
+import com.thitsaworks.mojaloop.coreconnector.mapper.nats.PostTransferMapper;
 import com.thitsaworks.mojaloop.coreconnector.nats.NatsPullListener;
 import com.thitsaworks.mojaloop.coreconnector.nats.NatsService;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
@@ -27,8 +27,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.stereotype.Component;
-
-import java.math.BigDecimal;
 
 @Component
 public class TransfersListener implements InitializingBean, DisposableBean {
@@ -51,13 +49,16 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
     private final ObjectMapper objectMapper;
 
+    private final PostTransferMapper transferMapper;
+
     public TransfersListener(NatsService natsService,
                              FspiopCallbackService callback,
                              IlpService ilp,
                              PendingTransfersStore pendingStore,
                              FspClientService fspClientService,
                              CoreConnectorConfiguration.Settings config,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             PostTransferMapper transferMapper) {
 
         this.natsService = natsService;
         this.callback = callback;
@@ -66,6 +67,7 @@ public class TransfersListener implements InitializingBean, DisposableBean {
         this.fspClientService = fspClientService;
         this.config = config;
         this.objectMapper = objectMapper;
+        this.transferMapper = transferMapper;
     }
 
     @Override
@@ -73,8 +75,7 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         String connectorId = config.getConnectorId();
         String subject = natsService.getTransfersSubject();
-        String durable = natsService.normalizeDurable(
-            connectorId, "connector-consumer-post-transfers");
+        String durable = natsService.normalizeDurable(connectorId, "connector-consumer-post-transfers");
 
         JetStreamManagement jsm = natsService.jetstreamManager();
         String stream = natsService.ensureStream(jsm, subject);
@@ -82,9 +83,12 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         LOG.info("Listening on '{}'", subject);
 
-        listener = new NatsPullListener<>(
-            LOG, natsService, "PostTransfers", PostTransfersNatsMessage.class,
-            data -> handle(data, connectorId), MdcExtractors::postTransfers);
+        listener = new NatsPullListener<>(LOG,
+                                          natsService,
+                                          "PostTransfers",
+                                          PostTransfersNatsMessage.class,
+                                          data -> handle(data, connectorId),
+                                          MdcExtractors::postTransfers);
         listener.start(subject, stream, durable, "transfers-listener");
     }
 
@@ -100,28 +104,39 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         TransfersPostRequest request = msg.getRequest();
         String transferId = request != null ? request.getTransferId() : null;
-        LOG.info(
-            "Post Transfer request info from the Inbound to Payee cc for TransferId {} : {}",
-            request.getTransferId(), this.objectMapper.writeValueAsString(request));
+        LOG.info("Post Transfer request info from the Inbound to Payee cc for TransferId {} : {}",
+                 request.getTransferId(),
+                 this.objectMapper.writeValueAsString(request));
 
         try {
             if (request == null) {
                 throw new IllegalArgumentException("Transfers request is missing");
             }
 
-            String amount = request.getAmount().getAmount();
-            String currency = request.getAmount().getCurrency().toString();
+            String
+                amount =
+                request.getAmount()
+                       .getAmount();
+            String
+                currency =
+                request.getAmount()
+                       .getCurrency()
+                       .toString();
 
             LOG.info("postTransfers transferId={} amount={} {}", transferId, amount, currency);
 
             if (!connectorId.equals(request.getPayeeFsp())) {
-                LOG.warn(
-                    "postTransfers transferId={} payeeFsp={} does not match connectorId={} - aborting",
-                    transferId, request.getPayeeFsp(), connectorId);
+                LOG.warn("postTransfers transferId={} payeeFsp={} does not match connectorId={} - aborting",
+                         transferId,
+                         request.getPayeeFsp(),
+                         connectorId);
 
-                callback.putTransfers(
-                    config.getTransfersUrl(), msg.getCorrelationId(), connectorId,
-                    msg.getPayerFsp(), transferId, abortedResponse(request));
+                callback.putTransfers(config.getTransfersUrl(),
+                                      msg.getCorrelationId(),
+                                      connectorId,
+                                      msg.getPayerFsp(),
+                                      transferId,
+                                      abortedResponse(request));
                 return;
             }
 
@@ -129,121 +144,122 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             IlpAgreement agreement = ilp.parseAgreement(prepare, IlpAgreement.class);
 
             if (agreement == null || agreement.payee() == null) {
-                throw new IllegalStateException(
-                    "ILP agreement payee is missing for transferId=" + transferId);
+                throw new IllegalStateException("ILP agreement payee is missing for transferId=" + transferId);
             }
 
-            String payeeMobile = agreement.payee().getPartyIdentifier();
+            String
+                payeeMobile =
+                agreement.payee()
+                         .getPartyIdentifier();
             if (payeeMobile == null || payeeMobile.isBlank()) {
                 throw new IllegalStateException(
-                    "Payee partyIdentifier missing from ILP agreement for transferId=" +
-                        transferId);
+                    "Payee partyIdentifier missing from ILP agreement for transferId=" + transferId);
             }
 
             long amountMinor = ilp.toMinorUnits(amount, currency);
             long lifetimeSeconds = ilp.resolveLifetimeSeconds(request.getExpiration());
 
-            IlpService.FulfilResult fulfilResult = ilp.computeFulfilment(
-                connectorId, amountMinor,
-                prepare.data(), request.getCondition(), lifetimeSeconds);
+            IlpService.FulfilResult fulfilResult = ilp.computeFulfilment(connectorId,
+                                                                         amountMinor,
+                                                                         prepare.data(),
+                                                                         request.getCondition(),
+                                                                         lifetimeSeconds);
 
             if (!fulfilResult.valid()) {
-                throw new IllegalStateException(
-                    "ILP condition mismatch for transferId=" + transferId);
+                throw new IllegalStateException("ILP condition mismatch for transferId=" + transferId);
             }
 
             Money payeeReceiveAmount = agreement.payeeReceiveAmount();
 
-            String homeTransactionId = reserveTransfer(
-                transferId, payeeMobile, amount, payeeReceiveAmount);
+            String homeTransactionId = reserveTransfer(agreement, request);
 
-            pendingStore.set(
-                transferId,
-                new PendingTransfer(payeeMobile, amount, payeeReceiveAmount,currency, homeTransactionId,request.getExtensionList()));
+            pendingStore.set(transferId,
+                             new PendingTransfer(payeeMobile,
+                                                 agreement.payer().getPartyIdentifier(),
+                                                 amount,
+                                                 payeeReceiveAmount,
+                                                 currency,
+                                                 homeTransactionId,
+                                                 request.getPayerFsp(),
+                                                 request.getPayeeFsp(),
+                                                 agreement.note(),
+                                                 request.getExtensionList()));
 
-            TransfersIDPutResponse response = new TransfersIDPutResponse()
-                                                  .transferState(TransferState.RESERVED)
-                                                  .fulfilment(fulfilResult.base64Fulfillment())
-                                                  .completedTimestamp(now())
-                                                  .extensionList(request.getExtensionList());
+            TransfersIDPutResponse
+                response =
+                new TransfersIDPutResponse().transferState(TransferState.RESERVED)
+                                            .fulfilment(fulfilResult.base64Fulfillment())
+                                            .completedTimestamp(now())
+                                            .extensionList(request.getExtensionList());
 
-            LOG.info(
-                "Post transfer response from Payee cc to Hub for TransferId {} : {}",
-                request.getTransferId(), this.objectMapper.writeValueAsString(response));
+            LOG.info("Post transfer response from Payee cc to Hub for TransferId {} : {}",
+                     request.getTransferId(),
+                     this.objectMapper.writeValueAsString(response));
 
-            callback.putTransfers(
-                config.getTransfersUrl(), msg.getCorrelationId(), connectorId, msg.getPayerFsp(),
-                transferId, response);
+            callback.putTransfers(config.getTransfersUrl(),
+                                  msg.getCorrelationId(),
+                                  connectorId,
+                                  msg.getPayerFsp(),
+                                  transferId,
+                                  response);
 
-            LOG.info(
-                "postTransfers RESERVED transferId={} payeeMobile={} homeTransactionId={}",
-                transferId, payeeMobile, homeTransactionId);
+            LOG.info("postTransfers RESERVED transferId={} payeeMobile={} homeTransactionId={}",
+                     transferId,
+                     payeeMobile,
+                     homeTransactionId);
         } catch (Exception err) {
             LOG.error("postTransfers failed transferId={}: {}", transferId, err.getMessage(), err);
 
             if (transferId != null) {
                 pendingStore.delete(transferId);
 
-                callback.putTransfersError(
-                    config.getTransfersUrl(), msg.getCorrelationId(), connectorId,
-                    msg.getPayerFsp(), transferId, toErrorResponse(err, transferId));
+                callback.putTransfersError(config.getTransfersUrl(),
+                                           msg.getCorrelationId(),
+                                           connectorId,
+                                           msg.getPayerFsp(),
+                                           transferId,
+                                           toErrorResponse(err, transferId));
             }
         }
     }
 
-    private String reserveTransfer(String transferId,
-                                   String payeeMobile,
-                                   String amount,
-                                   Money payeeReceiveAmount)
+    private String reserveTransfer(IlpAgreement agreement, TransfersPostRequest transfersPostRequest)
         throws JsonProcessingException, PostTransferException {
 
-        ReservationForTransfer.Request request = new ReservationForTransfer.Request();
-        request.setTransferId(transferId);
-        request.setAmount(amount);
-
-        FspParty payee = new FspParty();
-        payee.setIdValue(payeeMobile);
-        request.setTo(payee);
-
-        ReservationForTransfer.Quote quote = new ReservationForTransfer.Quote();
-        if (payeeReceiveAmount != null && payeeReceiveAmount.getAmount() != null &&
-                !payeeReceiveAmount.getAmount().isBlank()) {
-            quote.setPayeeReceiveAmount(new BigDecimal(payeeReceiveAmount.getAmount()));
-        }
-        request.setQuote(quote);
-
-        ReservationForTransfer.Response response = fspClientService.doReservationForTransfer(
-            request);
+        ReservationForTransfer.Response
+            response =
+            fspClientService.doReservationForTransfer(transferMapper.transferMapper(agreement, transfersPostRequest));
 
         if (response == null) {
-            throw new PostTransferException(
-                String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),
-                "No response from DFSP backend for transferId=" + transferId);
+            throw new PostTransferException(String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),
+                                            "No response from DFSP backend for transferId=" +
+                                                transfersPostRequest.getTransferId());
         }
 
-        if (response.getError() != null && response.getError().getErrorInformation() != null) {
-            var errorInformation = response.getError().getErrorInformation();
-            throw new PostTransferException(
-                errorInformation.getStatusCode(), errorInformation.getMessage());
+        if (response.getError() != null && response.getError()
+                                                   .getErrorInformation() != null) {
+            var
+                errorInformation =
+                response.getError()
+                        .getErrorInformation();
+            throw new PostTransferException(errorInformation.getStatusCode(), errorInformation.getMessage());
         }
 
-        LOG.info(
-            "Post transfer response from Payee for TransferId {} : {}", request.getTransferId(),
-            this.objectMapper.writeValueAsString(response));
+        LOG.info("Post transfer response from Payee for TransferId {} : {}",
+                 transfersPostRequest.getTransferId(),
+                 this.objectMapper.writeValueAsString(response));
 
         return response.getHomeTransactionId();
     }
 
     private TransfersIDPutResponse abortedResponse(TransfersPostRequest request) {
 
-        return new TransfersIDPutResponse()
-                   .transferState(TransferState.ABORTED)
-                   .completedTimestamp(now())
-                   .extensionList(request.getExtensionList());
+        return new TransfersIDPutResponse().transferState(TransferState.ABORTED)
+                                           .completedTimestamp(now())
+                                           .extensionList(request.getExtensionList());
     }
 
-    private ErrorInformationResponse toErrorResponse(Exception err, String idValue)
-        throws JsonProcessingException {
+    private ErrorInformationResponse toErrorResponse(Exception err, String idValue) throws JsonProcessingException {
 
         String errorCode = String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode());
         String errorDescription = err.getMessage();
@@ -251,14 +267,15 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             errorCode = postTransferException.errorCode();
             errorDescription = postTransferException.getMessage();
         }
-        ErrorInformation errorInformation = new ErrorInformation()
-                                                .errorCode(errorCode)
-                                                .errorDescription(errorDescription);
+        ErrorInformation
+            errorInformation =
+            new ErrorInformation().errorCode(errorCode)
+                                  .errorDescription(errorDescription);
         ErrorInformationResponse errorInformationResponse = new ErrorInformationResponse().errorInformation(
             errorInformation);
-        LOG.error(
-            "Post Transfer error Response from Payee cc to HUB for idValue {} : {}", idValue,
-            this.objectMapper.writeValueAsString(errorInformationResponse));
+        LOG.error("Post Transfer error Response from Payee cc to HUB for idValue {} : {}",
+                  idValue,
+                  this.objectMapper.writeValueAsString(errorInformationResponse));
 
         return errorInformationResponse;
     }
@@ -282,10 +299,9 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
     private String now() {
 
-        return java.time.format.DateTimeFormatter
-                   .ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                   .withZone(java.time.ZoneOffset.UTC)
-                   .format(java.time.Instant.now());
+        return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+                                                 .withZone(java.time.ZoneOffset.UTC)
+                                                 .format(java.time.Instant.now());
     }
 
 }

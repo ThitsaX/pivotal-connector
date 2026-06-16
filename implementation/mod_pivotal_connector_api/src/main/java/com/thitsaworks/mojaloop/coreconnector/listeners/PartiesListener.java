@@ -58,8 +58,7 @@ public class PartiesListener implements InitializingBean, DisposableBean {
 
         String connectorId = config.getConnectorId();
         String subject = natsService.getPartiesSubject();
-        String durable = natsService.normalizeDurable(
-            connectorId, "connector-consumer-get-parties");
+        String durable = natsService.normalizeDurable(connectorId, "connector-consumer-get-parties");
 
         JetStreamManagement jsm = natsService.jetstreamManager();
         String stream = natsService.ensureStream(jsm, subject);
@@ -67,10 +66,12 @@ public class PartiesListener implements InitializingBean, DisposableBean {
 
         LOG.info("Listening on '{}'", subject);
 
-        listener = new NatsPullListener<>(
-            LOG, natsService, "GetParties",
-            GetPartiesNatsMessage.class, data -> handle(data, connectorId),
-            MdcExtractors::getParties);
+        listener = new NatsPullListener<>(LOG,
+                                          natsService,
+                                          "GetParties",
+                                          GetPartiesNatsMessage.class,
+                                          data -> handle(data, connectorId),
+                                          MdcExtractors::getParties);
         listener.start(subject, stream, durable, "parties-listener");
     }
 
@@ -88,10 +89,12 @@ public class PartiesListener implements InitializingBean, DisposableBean {
         String payerFsp = msg.getPayerFsp();
         String partyIdType = msg.getPartyIdType();
         String partyId = msg.getPartyId();
-        String subId = msg.getSubId() == null || msg.getSubId().isBlank() ? null : msg.getSubId();
+        String
+            subId =
+            msg.getSubId() == null || msg.getSubId()
+                                         .isBlank() ? null : msg.getSubId();
 
-        LOG.info(
-            "Get Party request info from the inbound to Payee cc: {}, {}", partyIdType, partyId);
+        LOG.info("Get Party request info from the inbound to Payee cc: {}, {}", partyIdType, partyId);
 
         try {
             LookUp.Request request = new LookUp.Request();
@@ -100,57 +103,69 @@ public class PartiesListener implements InitializingBean, DisposableBean {
 
             LookUp.Response lookupResponse = fspClientService.doLookUp(request);
             if (lookupResponse == null) {
-                throw new PartyLookupException(
-                    String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),
-                    "No response from DFSP backend for partyId=" + partyId);
+                throw new PartyLookupException(String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),
+                                               "No response from DFSP backend for partyId=" + partyId);
             }
-            if (lookupResponse.getError() != null &&
-                    lookupResponse.getError().getErrorInformation() != null) {
-                var errorInformation = lookupResponse.getError().getErrorInformation();
-                throw new PartyLookupException(
-                    errorInformation.getStatusCode(), errorInformation.getMessage());
+            if (lookupResponse.getError() != null && lookupResponse.getError()
+                                                                   .getErrorInformation() != null) {
+                var
+                    errorInformation =
+                    lookupResponse.getError()
+                                  .getErrorInformation();
+                throw new PartyLookupException(errorInformation.getStatusCode(), errorInformation.getMessage());
             }
-            PartyIdInfo partyIdInfo = new PartyIdInfo()
-                                          .partyIdType(lookupResponse.getIdType())
-                                          .partyIdentifier(lookupResponse.getIdValue())
-                                          .fspId(connectorId)
-                                          .partySubIdOrType(lookupResponse.getIdSubValue());
+            PartyIdInfo
+                partyIdInfo =
+                new PartyIdInfo().partyIdType(lookupResponse.getIdType())
+                                 .partyIdentifier(lookupResponse.getIdValue())
+                                 .fspId(connectorId)
+                                 .partySubIdOrType(lookupResponse.getIdSubValue());
 
-            String name =
+            String
+                name =
                 lookupResponse.getDisplayName() != null ? lookupResponse.getDisplayName() :
                     lookupResponse.getFirstName() + " " + lookupResponse.getMiddleName() + " " +
                         lookupResponse.getLastName();
 
-            Party party = new Party()
-                              .partyIdInfo(partyIdInfo)
-                              .name(name)
-                              .merchantClassificationCode(
-                                  lookupResponse.getMerchantClassificationCode())
-                              .supportedCurrencies(lookupResponse.getSupportedCurrencies());
+            Party
+                party =
+                new Party().partyIdInfo(partyIdInfo)
+                           .name(name)
+                           .merchantClassificationCode(lookupResponse.getMerchantClassificationCode())
+                           .supportedCurrencies(lookupResponse.getSupportedCurrencies());
             PartiesTypeIDPutResponse callbackResponse = new PartiesTypeIDPutResponse();
             callbackResponse.setParty(party);
-            LOG.info(
-                "LookUp response from Payee for idValue {} : {}", lookupResponse.getIdValue(),
-                this.objectMapper.writeValueAsString(lookupResponse));
+            LOG.info("LookUp response from Payee for idValue {} : {}",
+                     lookupResponse.getIdValue(),
+                     this.objectMapper.writeValueAsString(lookupResponse));
 
-            callback.putParties(
-                config.getPartiesUrl(), correlationId, connectorId, payerFsp, partyIdType, partyId,
-                callbackResponse, subId);
+            callback.putParties(config.getPartiesUrl(),
+                                correlationId,
+                                connectorId,
+                                payerFsp,
+                                partyIdType,
+                                partyId,
+                                callbackResponse,
+                                subId);
 
-            LOG.info(
-                "Get Party Response from Payee cc to hub for idValue {} : {}",
-                lookupResponse.getIdValue(), this.objectMapper.writeValueAsString(lookupResponse));
+            LOG.info("Get Party Response from Payee cc to hub for idValue {} : {}",
+                     lookupResponse.getIdValue(),
+                     this.objectMapper.writeValueAsString(lookupResponse));
         } catch (Exception err) {
-            callback.putPartiesError(
-                config.getPartiesUrl(), correlationId, connectorId, payerFsp, partyIdType, partyId,
-                toErrorResponse(err, partyId), subId);
+            callback.putPartiesError(config.getPartiesUrl(),
+                                     correlationId,
+                                     connectorId,
+                                     payerFsp,
+                                     partyIdType,
+                                     partyId,
+                                     toErrorResponse(err, partyId),
+                                     subId);
         }
     }
 
 //  Error Handling
 
-    private ErrorInformationResponse toErrorResponse(Exception err, String idValue)
-        throws JsonProcessingException {
+    private ErrorInformationResponse toErrorResponse(Exception err, String idValue) throws JsonProcessingException {
 
         String errorCode = String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode());
         String errorDescription = err.getMessage();
@@ -170,14 +185,15 @@ public class PartiesListener implements InitializingBean, DisposableBean {
             errorCode = String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode());
         }
 
-        ErrorInformation errorInformation = new ErrorInformation()
-                                                .errorCode(errorCode)
-                                                .errorDescription(errorDescription);
+        ErrorInformation
+            errorInformation =
+            new ErrorInformation().errorCode(errorCode)
+                                  .errorDescription(errorDescription);
         ErrorInformationResponse errorInformationResponse = new ErrorInformationResponse().errorInformation(
             errorInformation);
-        LOG.error(
-            "Get Party error Response from Payee cc to HUB for idValue {} : {}", idValue,
-            this.objectMapper.writeValueAsString(errorInformationResponse));
+        LOG.error("Get Party error Response from Payee cc to HUB for idValue {} : {}",
+                  idValue,
+                  this.objectMapper.writeValueAsString(errorInformationResponse));
 
         return errorInformationResponse;
     }

@@ -24,22 +24,43 @@ public class IlpService {
 
     private static final Logger LOG = LoggerFactory.getLogger(IlpService.class);
 
-    private static final Map<String, Integer> CURRENCY_SCALE = Map.ofEntries(
-        Map.entry("USD", 2), Map.entry("EUR", 2), Map.entry("GBP", 2), Map.entry("AUD", 2),
-        Map.entry("CAD", 2), Map.entry("CHF", 2), Map.entry("CNY", 2), Map.entry("HKD", 2),
-        Map.entry("SGD", 2), Map.entry("SEK", 2), Map.entry("NOK", 2), Map.entry("DKK", 2),
-        Map.entry("NZD", 2), Map.entry("MXN", 2), Map.entry("BRL", 2), Map.entry("ZAR", 2),
-        Map.entry("KES", 2), Map.entry("GHS", 2), Map.entry("NGN", 2), Map.entry("LRD", 2),
-        Map.entry("ZMW", 2), Map.entry("MWK", 2), Map.entry("TZS", 0), Map.entry("UGX", 0),
-        Map.entry("XOF", 0), Map.entry("XAF", 0), Map.entry("JPY", 0), Map.entry("MMK", 0),
-        Map.entry("RWF", 0), Map.entry("BIF", 0), Map.entry("GNF", 0));
+    private static final Map<String, Integer> CURRENCY_SCALE = Map.ofEntries(Map.entry("USD", 2),
+                                                                             Map.entry("EUR", 2),
+                                                                             Map.entry("GBP", 2),
+                                                                             Map.entry("AUD", 2),
+                                                                             Map.entry("CAD", 2),
+                                                                             Map.entry("CHF", 2),
+                                                                             Map.entry("CNY", 2),
+                                                                             Map.entry("HKD", 2),
+                                                                             Map.entry("SGD", 2),
+                                                                             Map.entry("SEK", 2),
+                                                                             Map.entry("NOK", 2),
+                                                                             Map.entry("DKK", 2),
+                                                                             Map.entry("NZD", 2),
+                                                                             Map.entry("MXN", 2),
+                                                                             Map.entry("BRL", 2),
+                                                                             Map.entry("ZAR", 2),
+                                                                             Map.entry("KES", 2),
+                                                                             Map.entry("GHS", 2),
+                                                                             Map.entry("NGN", 2),
+                                                                             Map.entry("LRD", 2),
+                                                                             Map.entry("ZMW", 2),
+                                                                             Map.entry("MWK", 2),
+                                                                             Map.entry("TZS", 0),
+                                                                             Map.entry("UGX", 0),
+                                                                             Map.entry("XOF", 0),
+                                                                             Map.entry("XAF", 0),
+                                                                             Map.entry("JPY", 0),
+                                                                             Map.entry("MMK", 0),
+                                                                             Map.entry("RWF", 0),
+                                                                             Map.entry("BIF", 0),
+                                                                             Map.entry("GNF", 0));
 
     private static final long FIFTEEN_MINUTES_MS = 15L * 60 * 1000;
 
-    private static final DateTimeFormatter EXPIRATION_FORMATTER = DateTimeFormatter
-                                                                      .ofPattern(
-                                                                          "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-                                                                      .withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter EXPIRATION_FORMATTER = DateTimeFormatter.ofPattern(
+                                                                                       "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+                                                                                   .withZone(ZoneOffset.UTC);
 
     private final CoreConnectorConfiguration.Settings config;
 
@@ -51,9 +72,7 @@ public class IlpService {
         this.objectMapper = objectMapper;
     }
 
-    public record PrepareResult(String base64PreparePacket,
-                                String base64Fulfillment,
-                                String base64Condition) { }
+    public record PrepareResult(String base64PreparePacket, String base64Fulfillment, String base64Condition) { }
 
     public record FulfilResult(boolean valid, String base64Fulfillment) { }
 
@@ -65,10 +84,8 @@ public class IlpService {
                                 String destination,
                                 String data) { }
 
-    public PrepareResult prepare(String connectorId,
-                                 long amountMinor,
-                                 Object agreement,
-                                 long expireAtMs) throws Exception {
+    public PrepareResult prepare(String connectorId, long amountMinor, Object agreement, long expireAtMs)
+        throws Exception {
 
         String peer = "g." + connectorId;
         String data = objectMapper.writeValueAsString(agreement);
@@ -76,13 +93,11 @@ public class IlpService {
         byte[] preimage = derivePreimage(config.getIlpSecret(), amountMinor, peer, data);
         byte[] conditionBytes = sha256(preimage);
 
-        byte[] packet = serializeIlpPrepare(
-            amountMinor, conditionBytes,
-            Instant.ofEpochMilli(expireAtMs), peer, data);
+        byte[] packet = serializeIlpPrepare(amountMinor, conditionBytes, Instant.ofEpochMilli(expireAtMs), peer, data);
 
-        return new PrepareResult(
-            encodeUrlSafe(packet, true), encodeUrlSafe(preimage, false),
-            encodeUrlSafe(conditionBytes, false));
+        return new PrepareResult(encodeUrlSafe(packet, true),
+                                 encodeUrlSafe(preimage, false),
+                                 encodeUrlSafe(conditionBytes, false));
     }
 
     public FulfilResult computeFulfilment(String connectorId,
@@ -120,8 +135,7 @@ public class IlpService {
 
         byte[] timestampBytes = new byte[18];
         buf.get(timestampBytes);
-        Instant expiresAt = parseIlpTimestamp(
-            new String(timestampBytes, StandardCharsets.US_ASCII));
+        Instant expiresAt = parseIlpTimestamp(new String(timestampBytes, StandardCharsets.US_ASCII));
 
         byte[] conditionBytes = new byte[32];
         buf.get(conditionBytes);
@@ -138,10 +152,11 @@ public class IlpService {
             throw new IllegalArgumentException("Invalid ILP prepare packet length");
         }
 
-        return new ParsedPrepare(
-            amountMinor, encodeUrlSafe(conditionBytes, false), expiresAt,
-            new String(destinationBytes, StandardCharsets.US_ASCII),
-            new String(dataBytes, StandardCharsets.UTF_8));
+        return new ParsedPrepare(amountMinor,
+                                 encodeUrlSafe(conditionBytes, false),
+                                 expiresAt,
+                                 new String(destinationBytes, StandardCharsets.US_ASCII),
+                                 new String(dataBytes, StandardCharsets.UTF_8));
     }
 
     public <T> T parseAgreement(ParsedPrepare prepare, Class<T> clazz) {
@@ -157,10 +172,9 @@ public class IlpService {
 
         int scale = CURRENCY_SCALE.getOrDefault(currency.toUpperCase(), 2);
 
-        return new BigDecimal(amount)
-                   .movePointRight(scale)
-                   .setScale(0, RoundingMode.HALF_UP)
-                   .longValueExact();
+        return new BigDecimal(amount).movePointRight(scale)
+                                     .setScale(0, RoundingMode.HALF_UP)
+                                     .longValueExact();
     }
 
     public Expiration buildExpiration() {
@@ -172,8 +186,7 @@ public class IlpService {
 
         long epochMs = System.currentTimeMillis() + offsetMs;
         LOG.info("EpochMs value : {}", epochMs);
-        var expiration = new Expiration(
-            EXPIRATION_FORMATTER.format(Instant.ofEpochMilli(epochMs)), epochMs);
+        var expiration = new Expiration(EXPIRATION_FORMATTER.format(Instant.ofEpochMilli(epochMs)), epochMs);
         LOG.info("EpochMs value : {}", expiration);
         return expiration;
     }
@@ -181,7 +194,10 @@ public class IlpService {
     public long resolveLifetimeSeconds(String expiration) {
 
         try {
-            long expiresAt = Instant.parse(expiration).toEpochMilli();
+            long
+                expiresAt =
+                Instant.parse(expiration)
+                       .toEpochMilli();
             return Math.max(1L, (expiresAt - System.currentTimeMillis()) / 1000);
         } catch (Exception e) {
             return FIFTEEN_MINUTES_MS / 1000;
@@ -198,15 +214,13 @@ public class IlpService {
 
     public String computePayeeReceiveAmount(String amount, String fee) {
 
-        return new BigDecimal(amount)
-                   .subtract(new BigDecimal(fee))
-                   .setScale(4, RoundingMode.HALF_UP)
-                   .stripTrailingZeros()
-                   .toPlainString();
+        return new BigDecimal(amount).subtract(new BigDecimal(fee))
+                                     .setScale(4, RoundingMode.HALF_UP)
+                                     .stripTrailingZeros()
+                                     .toPlainString();
     }
 
-    private byte[] derivePreimage(String ilpSecret, long amount, String destination, String data)
-        throws Exception {
+    private byte[] derivePreimage(String ilpSecret, long amount, String destination, String data) throws Exception {
 
         String joined = ilpSecret + ":" + amount + ":" + destination + ":" + data;
         return sha256(joined.getBytes(StandardCharsets.UTF_8));
@@ -214,7 +228,8 @@ public class IlpService {
 
     private byte[] sha256(byte[] input) throws Exception {
 
-        return MessageDigest.getInstance("SHA-256").digest(input);
+        return MessageDigest.getInstance("SHA-256")
+                            .digest(input);
     }
 
     private byte[] serializeIlpPrepare(long amountMinor,
@@ -230,8 +245,10 @@ public class IlpService {
         byte[] destinationLengthBytes = oerLength(destinationBytes.length);
         byte[] dataLengthBytes = oerLength(dataBytes.length);
 
-        int contentLength = 8 + timestampBytes.length + 32 + destinationLengthBytes.length +
-                                destinationBytes.length + dataLengthBytes.length + dataBytes.length;
+        int
+            contentLength =
+            8 + timestampBytes.length + 32 + destinationLengthBytes.length + destinationBytes.length +
+                dataLengthBytes.length + dataBytes.length;
 
         byte[] outerLengthBytes = oerLength(contentLength);
 
@@ -261,15 +278,12 @@ public class IlpService {
 
         if (len < 256) {
             return new byte[]{
-                (byte) 0x81,
-                (byte) len};
+                (byte) 0x81, (byte) len};
         }
 
         if (len < 65536) {
             return new byte[]{
-                (byte) 0x82,
-                (byte) (len >> 8),
-                (byte) (len & 0xFF)};
+                (byte) 0x82, (byte) (len >> 8), (byte) (len & 0xFF)};
         }
 
         throw new IllegalArgumentException("OER length too large: " + len);
@@ -300,10 +314,14 @@ public class IlpService {
 
         ZonedDateTime zdt = instant.atZone(ZoneOffset.UTC);
 
-        return String.format(
-            "%04d%02d%02d%02d%02d%02d.%03d", zdt.getYear(), zdt.getMonthValue(),
-            zdt.getDayOfMonth(), zdt.getHour(), zdt.getMinute(), zdt.getSecond(),
-            zdt.getNano() / 1_000_000);
+        return String.format("%04d%02d%02d%02d%02d%02d.%03d",
+                             zdt.getYear(),
+                             zdt.getMonthValue(),
+                             zdt.getDayOfMonth(),
+                             zdt.getHour(),
+                             zdt.getMinute(),
+                             zdt.getSecond(),
+                             zdt.getNano() / 1_000_000);
     }
 
     private Instant parseIlpTimestamp(String value) {
@@ -316,14 +334,17 @@ public class IlpService {
         int second = Integer.parseInt(value.substring(12, 14));
         int millis = Integer.parseInt(value.substring(15, 18));
 
-        return ZonedDateTime
-                   .of(year, month, day, hour, minute, second, millis * 1_000_000, ZoneOffset.UTC)
-                   .toInstant();
+        return ZonedDateTime.of(year, month, day, hour, minute, second, millis * 1_000_000, ZoneOffset.UTC)
+                            .toInstant();
     }
 
     private String encodeUrlSafe(byte[] data, boolean padding) {
 
-        String encoded = Base64.getUrlEncoder().withoutPadding().encodeToString(data);
+        String
+            encoded =
+            Base64.getUrlEncoder()
+                  .withoutPadding()
+                  .encodeToString(data);
 
         if (!padding) {
             return encoded;
@@ -336,7 +357,8 @@ public class IlpService {
     private byte[] decodeUrlSafe(String value) {
 
         int padLength = (4 - value.length() % 4) % 4;
-        return Base64.getUrlDecoder().decode(value + "=".repeat(padLength));
+        return Base64.getUrlDecoder()
+                     .decode(value + "=".repeat(padLength));
     }
 
 }

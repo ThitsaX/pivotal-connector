@@ -21,19 +21,29 @@ public final class NatsPullListener<T> {
     }
 
     private static final int BATCH_SIZE = 10;
+
     private static final Duration FETCH_TIMEOUT = Duration.ofSeconds(5);
+
     private static final Duration RECONNECT_WAIT = Duration.ofSeconds(1);
+
     private static final Duration STOP_WAIT = Duration.ofSeconds(2);
 
     private final Logger log;
+
     private final NatsService natsService;
+
     private final String operationName;
+
     private final Class<T> messageType;
+
     private final Handler<T> handler;
+
     private final Function<T, Map<String, String>> mdcExtractor;
 
     private volatile boolean running;
+
     private volatile Thread thread;
+
     private volatile JetStreamSubscription subscription;
 
     public NatsPullListener(Logger log,
@@ -74,21 +84,24 @@ public final class NatsPullListener<T> {
             try {
                 currentThread.join(STOP_WAIT.toMillis());
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+                Thread.currentThread()
+                      .interrupt();
             }
         }
     }
 
     private void consume(String subject, String stream, String durable) {
 
-        while (running && !Thread.currentThread().isInterrupted()) {
+        while (running && !Thread.currentThread()
+                                 .isInterrupted()) {
             JetStreamSubscription currentSubscription = null;
             try {
                 currentSubscription = natsService.pullSubscribe(subject, stream, durable);
                 subscription = currentSubscription;
                 fetch(currentSubscription);
             } catch (Exception e) {
-                if (!running || Thread.currentThread().isInterrupted()) {
+                if (!running || Thread.currentThread()
+                                      .isInterrupted()) {
                     break;
                 }
 
@@ -112,7 +125,8 @@ public final class NatsPullListener<T> {
 
     private void fetch(JetStreamSubscription currentSubscription) {
 
-        while (running && !Thread.currentThread().isInterrupted()) {
+        while (running && !Thread.currentThread()
+                                 .isInterrupted()) {
             List<Message> messages = currentSubscription.fetch(BATCH_SIZE, FETCH_TIMEOUT);
             for (Message msg : messages) {
                 handle(msg);
@@ -143,17 +157,16 @@ public final class NatsPullListener<T> {
         try {
             Thread.sleep(RECONNECT_WAIT.toMillis());
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            Thread.currentThread()
+                  .interrupt();
         }
     }
 
     private boolean isInactiveSubscription(Exception e) {
 
-        return e instanceof IllegalStateException
-                   && e.getMessage() != null
-                   && e.getMessage()
-                       .toLowerCase()
-                       .contains("subscription is inactive");
+        return e instanceof IllegalStateException && e.getMessage() != null && e.getMessage()
+                                                                                .toLowerCase()
+                                                                                .contains("subscription is inactive");
     }
 
     private void safeUnsubscribe(JetStreamSubscription currentSubscription) {

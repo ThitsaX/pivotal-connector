@@ -109,7 +109,7 @@ public class PostQuoteMapper {
             request.getQuoteId(), request.getPayer().getPartyIdInfo(),
             request.getPayee().getPartyIdInfo(), request.getAmountType(), scenario, subScenario,
             request.getAmount(), payeeFspFee, payeeFspCommission, payeeReceiveAmount,
-            transferAmount, extensionList, expireAtMs);
+            transferAmount, extensionList, expireAtMs,request.getNote());
     }
 
     private FspParty toFspParty(Party party) {
@@ -163,6 +163,7 @@ public class PostQuoteMapper {
                                Money payeeReceiveAmount,
                                Money transferAmount,
                                ExtensionList extensionList,
-                               long expireAt) { }
+                               long expireAt,
+                               String note) { }
 
 }

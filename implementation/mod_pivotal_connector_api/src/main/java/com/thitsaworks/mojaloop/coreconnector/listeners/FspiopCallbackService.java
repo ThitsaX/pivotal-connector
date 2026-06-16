@@ -36,14 +36,12 @@ public class FspiopCallbackService {
 
     private static final String CT_TRANSFERS = "application/vnd.interoperability.transfers+json;version=2.0";
 
-    private static final Pattern TRACEPARENT = Pattern.compile(
-        "^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
+    private static final Pattern TRACEPARENT = Pattern.compile("^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
 
-    private static final DateTimeFormatter HTTP_DATE_FORMATTER = DateTimeFormatter
-                                                                     .ofPattern(
-                                                                         "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
-                                                                         Locale.US)
-                                                                     .withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern(
+                                                                                      "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
+                                                                                      Locale.US)
+                                                                                  .withZone(ZoneOffset.UTC);
 
     private final OkHttpClient http;
 
@@ -81,13 +79,10 @@ public class FspiopCallbackService {
         put(url, error, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
-    private String partiesUrl(String baseUrl,
-                              String partyIdType,
-                              String partyId,
-                              String subId,
-                              boolean error) {
+    private String partiesUrl(String baseUrl, String partyIdType, String partyId, String subId, boolean error) {
 
-        String url =
+        String
+            url =
             subId == null || subId.isBlank() ? baseUrl + "/parties/" + partyIdType + "/" + partyId :
                 baseUrl + "/parties/" + partyIdType + "/" + partyId + "/" + subId;
         return error ? url + "/error" : url;
@@ -100,9 +95,7 @@ public class FspiopCallbackService {
                           String quoteId,
                           QuotesIDPutResponse body) throws Exception {
 
-        put(
-            baseUrl + "/quotes/" + quoteId, body,
-            headers(CT_QUOTES, traceparent, source, destination, false));
+        put(baseUrl + "/quotes/" + quoteId, body, headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
     public void putQuotesError(String baseUrl,
@@ -112,8 +105,8 @@ public class FspiopCallbackService {
                                String quoteId,
                                ErrorInformationResponse error) throws Exception {
 
-        put(
-            baseUrl + "/quotes/" + quoteId + "/error", error,
+        put(baseUrl + "/quotes/" + quoteId + "/error",
+            error,
             headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
@@ -124,9 +117,7 @@ public class FspiopCallbackService {
                              String transferId,
                              TransfersIDPutResponse body) throws Exception {
 
-        put(
-            baseUrl + "/transfers/" + transferId, body,
-            headers(CT_TRANSFERS, traceparent, source, destination, false));
+        put(baseUrl + "/transfers/" + transferId, body, headers(CT_TRANSFERS, traceparent, source, destination, false));
     }
 
     public void putTransfersError(String baseUrl,
@@ -136,8 +127,8 @@ public class FspiopCallbackService {
                                   String transferId,
                                   ErrorInformationResponse error) throws Exception {
 
-        put(
-            baseUrl + "/transfers/" + transferId + "/error", error,
+        put(baseUrl + "/transfers/" + transferId + "/error",
+            error,
             headers(CT_TRANSFERS, traceparent, source, destination, false));
     }
 
@@ -171,7 +162,8 @@ public class FspiopCallbackService {
         if (value == null || value.isBlank()) {
             return false;
         }
-        return TRACEPARENT.matcher(value).matches(); // remove the zero-rejection
+        return TRACEPARENT.matcher(value)
+                          .matches(); // remove the zero-rejection
     }
 
     private void put(String url, Object body, Map<String, String> headers) throws Exception {
@@ -201,16 +193,22 @@ public class FspiopCallbackService {
             }
         };
 
-        Request.Builder builder = new Request.Builder().url(url).put(requestBody);
+        Request.Builder
+            builder =
+            new Request.Builder().url(url)
+                                 .put(requestBody);
         headers.forEach(builder::header);
 
-        try (Response response = http.newCall(builder.build()).execute()) {
+        try (Response response = http.newCall(builder.build())
+                                     .execute()) {
             if (!response.isSuccessful()) {
-                String responseBody = response.body() != null ? response.body().string() : "";
+                String
+                    responseBody =
+                    response.body() != null ? response.body()
+                                                      .string() : "";
                 log.error("PUT {} failed: HTTP {} body={}", url, response.code(), responseBody);
                 throw new IllegalStateException(
-                    "FSPIOP callback failed HTTP " + response.code() + " for " + url + ": " +
-                        responseBody);
+                    "FSPIOP callback failed HTTP " + response.code() + " for " + url + ": " + responseBody);
             }
         }
     }

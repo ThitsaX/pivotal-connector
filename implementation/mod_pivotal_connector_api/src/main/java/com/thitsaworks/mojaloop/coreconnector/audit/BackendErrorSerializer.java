@@ -52,11 +52,14 @@ public class BackendErrorSerializer {
             payload.put("responseBody", simulated.responseBody());
         }
 
-        if (input.context() != null && !input.context().isEmpty()) {
+        if (input.context() != null && !input.context()
+                                             .isEmpty()) {
             payload.put("context", input.context());
         }
 
-        payload.put("occurredAt", Instant.now().toString());
+        payload.put("occurredAt",
+                    Instant.now()
+                           .toString());
         return payload;
     }
 
@@ -71,16 +74,19 @@ public class BackendErrorSerializer {
             return message;
         }
 
-        return error.getClass().getSimpleName();
+        return error.getClass()
+                    .getSimpleName();
     }
 
     private String responseBody(HttpException error) {
 
-        if (error.response() == null || error.response().errorBody() == null) {
+        if (error.response() == null || error.response()
+                                             .errorBody() == null) {
             return null;
         }
 
-        try (ResponseBody body = error.response().errorBody()) {
+        try (ResponseBody body = error.response()
+                                      .errorBody()) {
             return body.string();
         } catch (Exception ignored) {
             return null;
@@ -89,14 +95,11 @@ public class BackendErrorSerializer {
 
     private Object truncate(String data) {
 
-        return data.length() > MAX_RESPONSE_BODY_LENGTH ?
-                   data.substring(0, MAX_RESPONSE_BODY_LENGTH) + "...[truncated]" : data;
+        return data.length() > MAX_RESPONSE_BODY_LENGTH ? data.substring(0, MAX_RESPONSE_BODY_LENGTH) +
+                                                              "...[truncated]" : data;
     }
 
-    public record BackendErrorInput(String source,
-                                    String operation,
-                                    Throwable error,
-                                    Map<String, Object> context) { }
+    public record BackendErrorInput(String source, String operation, Throwable error, Map<String, Object> context) { }
 
     public static class SimulatedBackendException extends RuntimeException {
 
