@@ -1,4 +1,4 @@
-name: Build and Release JAR
+name: Publish GitHub Package
 
 on:
   release:
@@ -11,6 +11,7 @@ jobs:
 
     permissions:
       contents: write
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -21,14 +22,13 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
           cache: maven
 
-      - name: Build JAR
-        run: mvn --batch-mode -pl implementation/mod_pivotal_connector_api -am clean package
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event.release.tag_name }}
-          files: implementation/mod_pivotal_connector_api/target/pivotal_connector_api.jar
-          generate_release_notes: true
+      - name: Publish to GitHub Packages
+        run: mvn --batch-mode clean deploy
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
