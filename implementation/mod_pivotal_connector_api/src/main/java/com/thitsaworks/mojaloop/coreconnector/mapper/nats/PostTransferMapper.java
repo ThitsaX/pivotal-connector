@@ -4,9 +4,10 @@ import com.thitsaworks.mojaloop.coreconnector.component.mojaloop.FspParty;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.IlpAgreement;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
+import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-
+@Component
 public class PostTransferMapper {
 
     public ReservationForTransfer.Request transferMapper(IlpAgreement agreement, TransfersPostRequest transfersPostRequest){
