@@ -8,8 +8,10 @@ import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformation;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Party;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyComplexName;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdInfo;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdType;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyPersonalInfo;
 import com.thitsaworks.mojaloop.coreconnector.logging.MdcExtractors;
 import com.thitsaworks.mojaloop.coreconnector.nats.NatsPullListener;
 import com.thitsaworks.mojaloop.coreconnector.nats.NatsService;
@@ -119,18 +121,22 @@ public class PartiesListener implements InitializingBean, DisposableBean {
                 new PartyIdInfo().partyIdType(lookupResponse.getIdType())
                                  .partyIdentifier(lookupResponse.getIdValue())
                                  .fspId(connectorId)
-                                 .partySubIdOrType(lookupResponse.getIdSubValue());
+                                 .partySubIdOrType(lookupResponse.getIdSubValue())
+                                 .extensionList(lookupResponse.getExtensionList());
+            PartyComplexName
+                complexName =
+                new PartyComplexName().firstName(lookupResponse.getFirstName())
+                                      .middleName(lookupResponse.getMiddleName())
+                                      .lastName(lookupResponse.getLastName());
 
-            String
-                name =
-                lookupResponse.getDisplayName() != null ? lookupResponse.getDisplayName() :
-                    lookupResponse.getFirstName() + " " + lookupResponse.getMiddleName() + " " +
-                        lookupResponse.getLastName();
+            PartyPersonalInfo personalInfo = new PartyPersonalInfo().complexName(complexName);
 
+            String name = buildDisplayName(lookupResponse);
             Party
                 party =
                 new Party().partyIdInfo(partyIdInfo)
                            .name(name)
+                           .personalInfo(personalInfo)
                            .merchantClassificationCode(lookupResponse.getMerchantClassificationCode())
                            .supportedCurrencies(lookupResponse.getSupportedCurrencies());
             PartiesTypeIDPutResponse callbackResponse = new PartiesTypeIDPutResponse();
@@ -213,6 +219,42 @@ public class PartiesListener implements InitializingBean, DisposableBean {
             return errorCode;
         }
 
+    }
+
+    private String buildDisplayName(LookUp.Response lookupResponse) {
+
+        if (lookupResponse.getDisplayName() != null && !lookupResponse.getDisplayName()
+                                                                      .isBlank()) {
+            return lookupResponse.getDisplayName();
+        }
+
+        StringBuilder nameBuilder = new StringBuilder();
+
+        if (lookupResponse.getFirstName() != null && !lookupResponse.getFirstName()
+                                                                    .isBlank()) {
+            nameBuilder.append(lookupResponse.getFirstName()
+                                             .trim());
+        }
+
+        if (lookupResponse.getMiddleName() != null && !lookupResponse.getMiddleName()
+                                                                     .isBlank()) {
+            if (nameBuilder.length() > 0) {
+                nameBuilder.append(' ');
+            }
+            nameBuilder.append(lookupResponse.getMiddleName()
+                                             .trim());
+        }
+
+        if (lookupResponse.getLastName() != null && !lookupResponse.getLastName()
+                                                                   .isBlank()) {
+            if (nameBuilder.length() > 0) {
+                nameBuilder.append(' ');
+            }
+            nameBuilder.append(lookupResponse.getLastName()
+                                             .trim());
+        }
+
+        return nameBuilder.toString();
     }
 
 }

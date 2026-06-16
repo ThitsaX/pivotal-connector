@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.thitsaworks.mojaloop.coreconnector.component.mojaloop.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Extension;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdType;
 import lombok.*;
 
@@ -68,7 +69,7 @@ public class LookUp {
         @JsonProperty("fspId")
         private String fspId;
 
-        private List<Extension> extensionList;
+        private ExtensionList extensionList;
 
         @JsonProperty("error")
         private ErrorInformationResponse error;
