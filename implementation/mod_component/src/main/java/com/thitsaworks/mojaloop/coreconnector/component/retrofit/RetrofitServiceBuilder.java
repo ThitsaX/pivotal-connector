@@ -66,6 +66,8 @@ public class RetrofitServiceBuilder<S> {
                                      : "****";
                     } else if (fieldName != null && fieldName.matches("(?i)pincode|pinCode")) {
                         masked = "****";
+                    } else if (fieldName != null && fieldName.matches("(?i)access_token|password")) {
+                        masked = "****";
                     }
 
                     jsonMatcher.appendReplacement(jsonResult, jsonMatcher.group(1) + masked + jsonMatcher.group(4));
@@ -74,14 +76,24 @@ public class RetrofitServiceBuilder<S> {
                 sanitized = jsonResult.toString();
 
                 // Then process query parameters
-                Pattern paramPattern = Pattern.compile("(?i)(auth:(?:user|pwd)=)([^&\\s]*)");
+                Pattern paramPattern = Pattern.compile(
+                    "(?i)((?:auth:(?:user|pwd)|X-PI-Client-Id|X-PI-Client-Secret|grant_type)=)([^&\\s]*)"
+                                                      );
                 Matcher paramMatcher = paramPattern.matcher(sanitized);
                 StringBuffer paramResult = new StringBuffer();
                 while (paramMatcher.find()) {
+                    String key = paramMatcher.group(1);
                     String value = paramMatcher.group(2);
-                    String masked = value.length() > 3
-                                        ? "****" + value.substring(value.length() - 3)
-                                        : "****";
+                    String masked;
+
+                    if (key != null && key.matches("(?i)grant_type=")) {
+                        masked = "****";
+                    } else {
+                        masked = value.length() > 3
+                                     ? "****" + value.substring(value.length() - 3)
+                                     : "****";
+                    }
+
                     paramMatcher.appendReplacement(paramResult, "$1" + masked);
                 }
                 paramMatcher.appendTail(paramResult);
@@ -96,6 +108,12 @@ public class RetrofitServiceBuilder<S> {
         HttpLoggingInterceptor loggingInterceptor = new HttpLoggingInterceptor(logger);
         loggingInterceptor.setLevel(level);
         loggingInterceptor.redactHeader("Authorization");
+        loggingInterceptor.redactHeader("X-PI-Client-Id");
+        loggingInterceptor.redactHeader("X-PI-Client-Secret");
+        loggingInterceptor.redactHeader("secret-key");
+        loggingInterceptor.redactHeader("secret-id");
+        loggingInterceptor.redactHeader("currentMemberId");
+
         this.httpClientBuilder.addInterceptor(loggingInterceptor);
 
         return this;

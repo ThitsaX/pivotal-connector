@@ -38,10 +38,10 @@ public class PostTransferMapper {
                 !transfersPostRequest.getAmount().getAmount().isBlank()) {
             quote.setPayeeReceiveAmount(new BigDecimal(agreement.payeeReceiveAmount().getAmount()));
             quote.setTransferAmount(new BigDecimal(agreement.transferAmount().getAmount()));
-            quote.setExtensionList(agreement.extensionList());
+            quote.setExtensionList(transfersPostRequest.getExtensionList());
         }
         request.setQuote(quote);
-        request.setQuoteRequestExtensions(agreement.extensionList());
+        request.setQuoteRequestExtensions(transfersPostRequest.getExtensionList());
         request.setSubScenario(agreement.subScenario());
         request.setTo(payee);
         request.setTransferId(transfersPostRequest.getTransferId());

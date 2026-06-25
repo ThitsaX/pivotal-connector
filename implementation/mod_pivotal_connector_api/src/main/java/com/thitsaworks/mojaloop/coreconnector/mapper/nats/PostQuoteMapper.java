@@ -6,6 +6,7 @@ import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Extension;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Money;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Party;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyComplexName;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdInfo;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
@@ -129,6 +130,13 @@ public class PostQuoteMapper {
         fspParty.setDisplayName(party.getName());
         fspParty.setMerchantClassificationCode(party.getMerchantClassificationCode());
 
+        PartyComplexName complexName = party.getPersonalInfo() != null
+                                           ? party.getPersonalInfo().getComplexName()
+                                           : null;
+        fspParty.setFirstName(complexName == null ? "" : blankToEmpty(complexName.getFirstName()));
+        fspParty.setMiddleName(complexName == null ? "" : blankToEmpty(complexName.getMiddleName()));
+        fspParty.setLastName(complexName == null ? "" : blankToEmpty(complexName.getLastName()));
+
         if (info.getExtensionList() != null) {
             fspParty.setExtensionList(info.getExtensionList().getExtension());
         }
@@ -149,6 +157,10 @@ public class PostQuoteMapper {
     private Currency resolve(Currency value, Currency fallback) {
 
         return value == null ? fallback : value;
+    }
+
+    private String blankToEmpty(String value) {
+        return value == null || value.isBlank() ? "" : value;
     }
 
     public record IlpAgreement(String quoteId,

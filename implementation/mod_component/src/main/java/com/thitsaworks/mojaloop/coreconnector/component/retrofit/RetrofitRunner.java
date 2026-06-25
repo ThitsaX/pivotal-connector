@@ -1,5 +1,6 @@
 package com.thitsaworks.mojaloop.coreconnector.component.retrofit;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import lombok.Getter;
 import okhttp3.ResponseBody;
 import org.slf4j.Logger;
@@ -118,7 +119,8 @@ public final class RetrofitRunner {
 
     public interface Invocation<SERVICE, I, O> {
 
-        Call<O> invoke(SERVICE service, I request);
+        Call<O> invoke(SERVICE service, I request)
+            throws InvocationException, JsonProcessingException;
 
     }
 
