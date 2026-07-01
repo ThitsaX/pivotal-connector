@@ -138,7 +138,7 @@ public class PostQuoteMapper {
         fspParty.setLastName(complexName == null ? "" : blankToEmpty(complexName.getLastName()));
 
         if (info.getExtensionList() != null) {
-            fspParty.setExtensionList(info.getExtensionList().getExtension());
+            fspParty.setExtensionList(info.getExtensionList());
         }
 
         return fspParty;

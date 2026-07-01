@@ -188,7 +188,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
             transferId,
             payeeMobile,
             amount,
-            payeeReceiveAmount,
+            payeeReceiveAmount.getAmount(),
             homeTransactionId,
             confirmationState);
 

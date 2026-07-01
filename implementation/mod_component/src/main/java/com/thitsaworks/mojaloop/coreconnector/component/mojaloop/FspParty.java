@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Extension;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdType;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransactionInitiatorType;
 import lombok.AllArgsConstructor;
@@ -62,6 +63,6 @@ public class FspParty implements Serializable {
     private String fspId;
 
     @JsonProperty("extensionList")
-    private List<Extension> extensionList;
+    private ExtensionList extensionList;
 
 }
