@@ -128,7 +128,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                 return;
             }
 
-            if (!COMMITTED.equals(transferState)) {
+            if (!shouldNotifyPayee(transferState)) {
                 LOG.warn("patchTransfers transferId={} state={} - skipping confirmation", transferId, transferState);
                 pendingStore.delete(transferId);
                 return;
@@ -335,6 +335,12 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                                                                         .toString();
     }
 
+    private boolean shouldNotifyPayee(String transferState) {
+
+        return transferState != null
+            && (COMMITTED.equals(transferState) || config.isConnectorConfirmAnyPatchState());
+    }
+
     private static final class PutTransferException extends Exception {
 
         private final String errorCode;
@@ -374,6 +380,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
         return errorInformationResponse;
     }
+
     private StateEnum confirmationState(String transferState) {
 
         return COMMITTED.equals(transferState) ? StateEnum.COMPLETED : StateEnum.valueOf(transferState);

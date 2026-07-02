@@ -4,7 +4,9 @@ import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForT
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.LookUp;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
+import org.springframework.stereotype.Component;
 
+@Component
 public interface FspClientService {
 
     LookUp.Response doLookUp(LookUp.Request request);

@@ -17,6 +17,7 @@ public class PostTransferMapper {
         payer.setIdSubValue(agreement.payer().getPartySubIdOrType() == null ? "" :
                                 agreement.payer().getPartySubIdOrType());
         payer.setFspId(agreement.payer().getFspId());
+        payer.setExtensionList(agreement.payer().getExtensionList());
 
         FspParty payee = new FspParty();
         payee.setIdType(agreement.payee().getPartyIdType());
@@ -24,6 +25,7 @@ public class PostTransferMapper {
         payee.setIdSubValue(agreement.payee().getPartySubIdOrType() == null ? "" :
                                 agreement.payee().getPartySubIdOrType());
         payee.setFspId(agreement.payee().getFspId());
+        payee.setExtensionList(agreement.payee().getExtensionList());
 
         ReservationForTransfer.Request request = new ReservationForTransfer.Request();
         request.setAmount(transfersPostRequest.getAmount().getAmount());
@@ -38,7 +40,7 @@ public class PostTransferMapper {
                 !transfersPostRequest.getAmount().getAmount().isBlank()) {
             quote.setPayeeReceiveAmount(new BigDecimal(agreement.payeeReceiveAmount().getAmount()));
             quote.setTransferAmount(new BigDecimal(agreement.transferAmount().getAmount()));
-            quote.setExtensionList(transfersPostRequest.getExtensionList());
+            quote.setExtensionList(agreement.extensionList());
         }
         request.setQuote(quote);
         request.setQuoteRequestExtensions(transfersPostRequest.getExtensionList());

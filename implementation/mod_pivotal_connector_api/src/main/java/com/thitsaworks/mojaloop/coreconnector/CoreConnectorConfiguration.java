@@ -61,6 +61,8 @@ public class CoreConnectorConfiguration {
 
         private final boolean connectorForcePatchError;
 
+        private final boolean connectorConfirmAnyPatchState;
+
         private final String partiesUrl;
 
         private final String quotesUrl;
@@ -104,6 +106,9 @@ public class CoreConnectorConfiguration {
             this.fspiopStreamName = prop("fspiopStreamName", "PIVOTAL_FSPIOP");
             this.pivotalAuditStreamName = prop("pivotalAuditStreamName", "PIVOTAL_AUDIT");
             this.connectorForcePatchError = propBoolean("connectorForcePatchError", false);
+            this.connectorConfirmAnyPatchState = propBoolean(
+                "connectorConfirmAnyPatchState",
+                false);
 
             String outbound = prop("outboundEndpoint", "http://localhost:4001");
             this.partiesUrl = prop("fspiopPartiesUrl", outbound);
@@ -209,5 +214,4 @@ public class CoreConnectorConfiguration {
     }
 
 }
-
 
