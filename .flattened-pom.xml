@@ -4,7 +4,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.thitsaworks.mojaloop.coreconnector</groupId>
   <artifactId>coreconnector</artifactId>
-  <version>0.0.10</version>
+  <version>0.0.11</version>
   <packaging>pom</packaging>
   <name>Pivotal Core Connector Parent</name>
   <description>Parent POM for Pivotal Core connector modules</description>
@@ -26,7 +26,7 @@
     <maven.compiler.source>21</maven.compiler.source>
     <jackson.version>2.17.2</jackson.version>
     <spring-boot.version>3.2.0</spring-boot.version>
-    <revision>0.0.10</revision>
+    <revision>0.0.11</revision>
     <nats.version>2.16.0</nats.version>
     <maven.compiler.target>21</maven.compiler.target>
     <jackson-databind-version>2.13.4.1</jackson-databind-version>
@@ -237,6 +237,31 @@
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <groupId>com.mycila</groupId>
+        <artifactId>license-maven-plugin</artifactId>
+        <version>4.6</version>
+        <executions>
+          <execution>
+            <id>license-format</id>
+            <phase>process-sources</phase>
+            <goals>
+              <goal>format</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <header>${maven.multiModuleProjectDirectory}/license-header.txt</header>
+          <mapping>
+            <java>SLASHSTAR_STYLE</java>
+          </mapping>
+          <includes>
+            <include>src/main/java/**/*.java</include>
+            <include>src/test/java/**/*.java</include>
+          </includes>
+          <strictCheck>true</strictCheck>
+        </configuration>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>flatten-maven-plugin</artifactId>
