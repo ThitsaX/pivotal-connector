@@ -119,14 +119,15 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         TransfersPostRequest request = msg.getRequest();
         String transferId = request != null ? request.getTransferId() : null;
-        LOG.info("Post Transfer request info from the Inbound to Payee cc for TransferId {} : {}",
-                 request.getTransferId(),
-                 this.objectMapper.writeValueAsString(request));
 
         try {
             if (request == null) {
                 throw new IllegalArgumentException("Transfers request is missing");
             }
+
+            LOG.info("Post Transfer request info from the Inbound to Payee cc for TransferId {} : {}",
+                     request.getTransferId(),
+                     this.objectMapper.writeValueAsString(request));
 
             String
                 amount =
@@ -158,13 +159,24 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             IlpService.ParsedPrepare prepare = ilp.unwrap(request.getIlpPacket());
             IlpAgreement agreement = ilp.parseAgreement(prepare, IlpAgreement.class);
 
-            if (agreement == null || agreement.payee() == null) {
-                throw new IllegalStateException("ILP agreement payee is missing for transferId=" + transferId);
+            if (agreement == null) {
+                throw new IllegalStateException("ILP agreement is missing for transferId=" + transferId);
+            }
+            if (agreement.payee() == null || agreement.payee()
+                                                        .getPartyIdInfo() == null) {
+                throw new IllegalStateException(
+                    "ILP agreement payee partyIdInfo is missing for transferId=" + transferId);
+            }
+            if (agreement.payer() == null || agreement.payer()
+                                                        .getPartyIdInfo() == null) {
+                throw new IllegalStateException(
+                    "ILP agreement payer partyIdInfo is missing for transferId=" + transferId);
             }
 
             String
                 payeeMobile =
                 agreement.payee()
+                         .getPartyIdInfo()
                          .getPartyIdentifier();
             if (payeeMobile == null || payeeMobile.isBlank()) {
                 throw new IllegalStateException(
@@ -174,10 +186,11 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             String
                 payerMobile =
                 agreement.payer()
+                         .getPartyIdInfo()
                          .getPartyIdentifier();
             if (payerMobile == null || payerMobile.isBlank()) {
                 throw new IllegalStateException(
-                    "Payee partyIdentifier missing from ILP agreement for transferId=" + transferId);
+                    "Payer partyIdentifier missing from ILP agreement for transferId=" + transferId);
             }
 
             long amountMinor = ilp.toMinorUnits(amount, currency);
@@ -197,8 +210,7 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
             pendingStore.set(transferId,
                              new PendingTransfer(payeeMobile,
-                                                 agreement.payer()
-                                                          .getPartyIdentifier(),
+                                                 payerMobile,
                                                  amount,
                                                  agreement.payeeReceiveAmount(),
                                                  currency,

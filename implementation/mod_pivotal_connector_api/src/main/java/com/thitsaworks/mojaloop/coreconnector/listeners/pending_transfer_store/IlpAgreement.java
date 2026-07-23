@@ -18,12 +18,13 @@ package com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.AmountType;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Money;
-import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdInfo;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Party;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransactionScenario;
 
 public record IlpAgreement(String quoteId,
-                           PartyIdInfo payer,
-                           PartyIdInfo payee,
+                           String transactionId,
+                           Party payer,
+                           Party payee,
                            AmountType amountType,
                            TransactionScenario scenario,
                            String subScenario,

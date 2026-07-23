@@ -144,7 +144,9 @@ public class PartiesListener implements InitializingBean, DisposableBean {
                                       .middleName(lookupResponse.getMiddleName())
                                       .lastName(lookupResponse.getLastName());
 
-            PartyPersonalInfo personalInfo = new PartyPersonalInfo().complexName(complexName);
+            PartyPersonalInfo personalInfo = new PartyPersonalInfo()
+                                                 .complexName(complexName)
+                                                 .dateOfBirth(lookupResponse.getDateOfBirth());
 
             String name = buildDisplayName(lookupResponse);
             Party

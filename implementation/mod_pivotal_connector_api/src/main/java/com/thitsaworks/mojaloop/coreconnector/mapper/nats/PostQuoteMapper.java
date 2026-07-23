@@ -16,6 +16,7 @@
 package com.thitsaworks.mojaloop.coreconnector.mapper.nats;
 
 import com.thitsaworks.mojaloop.coreconnector.component.mojaloop.FspParty;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.AmountType;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Extension;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
@@ -122,10 +123,10 @@ public class PostQuoteMapper {
         ExtensionList extensionList = quote.getExtensionList();
 
         return new IlpAgreement(
-            request.getQuoteId(), request.getPayer().getPartyIdInfo(),
-            request.getPayee().getPartyIdInfo(), request.getAmountType(), scenario, subScenario,
-            request.getAmount(), payeeFspFee, payeeFspCommission, payeeReceiveAmount,
-            transferAmount, extensionList, expireAtMs,request.getNote());
+            request.getQuoteId(), request.getTransactionId(), request.getPayer(),
+            request.getPayee(), request.getAmountType(), scenario, subScenario, request.getAmount(),
+            payeeFspFee, payeeFspCommission, payeeReceiveAmount, transferAmount, extensionList,
+            expireAtMs, request.getNote());
     }
 
     private FspParty toFspParty(Party party) {
@@ -144,6 +145,16 @@ public class PostQuoteMapper {
         fspParty.setFspId(info.getFspId() == null ? "" : info.getFspId());
         fspParty.setDisplayName(party.getName());
         fspParty.setMerchantClassificationCode(party.getMerchantClassificationCode());
+        String dateOfBirth =
+            party.getPersonalInfo() == null
+                ? null
+                : party.getPersonalInfo().getDateOfBirth();
+
+        fspParty.setDateOfBirth(
+            dateOfBirth == null || dateOfBirth.isBlank()
+                ? null
+                : dateOfBirth
+                               );
 
         PartyComplexName complexName = party.getPersonalInfo() != null
                                            ? party.getPersonalInfo().getComplexName()
@@ -179,9 +190,10 @@ public class PostQuoteMapper {
     }
 
     public record IlpAgreement(String quoteId,
-                               PartyIdInfo payer,
-                               PartyIdInfo payee,
-                               Object amountType,
+                               String transactionId,
+                               Party payer,
+                               Party payee,
+                               AmountType amountType,
                                TransactionScenario scenario,
                                String subScenario,
                                Money originalAmount,
