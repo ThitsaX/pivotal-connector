@@ -79,7 +79,7 @@ public class AuditPublisherService {
         this.natsService.jetstream().publish(SUBJECT, this.natsService.serialize(message));
 
         LOG.info(
-            "Published PATCH ERROR audit transferId={} payerFspId={} payeeFspId={}",
+            "Published PATCH ERROR audit transferId={} payerFsp={} payeeFsp={}",
             input.correlationId(), input.payerFsp(), input.payeeFsp());
     }
 
