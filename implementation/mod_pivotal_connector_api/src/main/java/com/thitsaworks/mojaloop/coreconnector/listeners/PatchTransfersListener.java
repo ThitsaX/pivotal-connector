@@ -158,6 +158,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                                                 pending.homeTransactionId(),
                                                                 pending.payerFspId(),
                                                                 pending.payeeFspId(),
+                                                                pending.subScenario(),
                                                                 pending.note(),
                                                                 confirmationState,
                                                                 pending.extensionList());
@@ -196,6 +197,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                    String homeTransactionId,
                                    String payerFspId,
                                    String payeeFspId,
+                                   String subScenario,
                                    String note,
                                    StateEnum confirmationState,
                                    ExtensionList extensionList) throws JsonProcessingException, PutTransferException {
@@ -221,6 +223,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                              currency,
                                              payerFspId,
                                              payeeFspId,
+                                             subScenario,
                                              note));
         request.setQuote(quote(extensionList));
         request.setCurrentState(confirmationState);
@@ -321,6 +324,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                                               String currency,
                                                               String payerFspId,
                                                               String payeeFspId,
+                                                              String subScenario,
                                                               String note) {
 
         ConfirmationForTransfer.Body body = new ConfirmationForTransfer.Body();
@@ -328,10 +332,18 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         body.setPayee(party(payeeMobile, payeeFspId));
         body.setAmount(amount(amount, currency));
         body.setPayeeReceiveAmount(new BigDecimal(payeeReceiveAmount.getAmount()));
+        body.setTransactionType(transactionType(subScenario));
         body.setNote(note);
         ConfirmationForTransfer.QuoteRequest quoteRequest = new ConfirmationForTransfer.QuoteRequest();
         quoteRequest.setBody(body);
         return quoteRequest;
+    }
+
+    private ConfirmationForTransfer.TransactionType transactionType(String subScenario) {
+
+        ConfirmationForTransfer.TransactionType transactionType = new ConfirmationForTransfer.TransactionType();
+        transactionType.setSubScenario(subScenario);
+        return transactionType;
     }
 
     private Party party(String identifier, String fspId) {

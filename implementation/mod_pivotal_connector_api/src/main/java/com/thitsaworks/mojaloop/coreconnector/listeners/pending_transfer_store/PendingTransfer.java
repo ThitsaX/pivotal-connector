@@ -26,5 +26,6 @@ public record PendingTransfer(String payeeMobile,
                               String homeTransactionId,
                               String payerFspId,
                               String payeeFspId,
+                              String subScenario,
                               String note,
                               ExtensionList extensionList) { }

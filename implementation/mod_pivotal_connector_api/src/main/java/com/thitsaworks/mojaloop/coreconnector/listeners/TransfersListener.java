@@ -217,6 +217,7 @@ public class TransfersListener implements InitializingBean, DisposableBean {
                                                  homeTransactionId,
                                                  request.getPayerFsp(),
                                                  request.getPayeeFsp(),
+                                                 agreement.subScenario(),
                                                  agreement.note(),
                                                  request.getExtensionList()));
 
