@@ -50,6 +50,9 @@ public class RetrofitServiceBuilder<S> {
 
     private final Retrofit.Builder retrofitBuilder = new Retrofit.Builder();
 
+    private HttpLoggingInterceptor loggingInterceptor = null;
+
+
     public RetrofitServiceBuilder(Class<S> service, String baseUrl) {
 
         this.service = service;
@@ -155,6 +158,17 @@ public class RetrofitServiceBuilder<S> {
 
         Retrofit retrofit = this.retrofitBuilder.client(this.httpClientBuilder.build())
                                                 .build();
+
+        return retrofit.create(this.service);
+    }
+    public S buildformtn() {
+
+        if (this.loggingInterceptor != null) {
+            // This is very problematic. So if we want to use, add this one at last.
+            this.httpClientBuilder.addInterceptor(this.loggingInterceptor);
+        }
+
+        Retrofit retrofit = this.retrofitBuilder.client(this.httpClientBuilder.build()).build();
 
         return retrofit.create(this.service);
     }
@@ -334,6 +348,23 @@ public class RetrofitServiceBuilder<S> {
         logging.setLevel(level);
 
         this.httpClientBuilder.addInterceptor(logging);
+
+        return this;
+    }
+
+    public RetrofitServiceBuilder<S> withHttpLoggingformtn(HttpLoggingInterceptor.Level level, boolean info) {
+
+        this.loggingInterceptor = new HttpLoggingInterceptor(message -> {
+            if (info) {
+                LOGGER.info("Retrofit : {}", message);
+            } else {
+                LOGGER.debug("Retrofit :{}", message);
+            }
+        });
+
+        this.loggingInterceptor.setLevel(level);
+
+        this.loggingInterceptor.redactHeader("Authorization");
 
         return this;
     }
