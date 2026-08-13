@@ -117,6 +117,7 @@ public class PartiesListener implements InitializingBean, DisposableBean {
             LookUp.Request request = new LookUp.Request();
             request.setIdType(PartyIdType.fromValue(partyIdType));
             request.setIdValue(partyId);
+            request.setIdSubValue(subId);
 
             LookUp.Response lookupResponse = fspClientService.doLookUp(request);
             if (lookupResponse == null) {

@@ -42,6 +42,9 @@ public class LookUp {
         @JsonProperty("idValue")
         private String idValue;
 
+        @JsonProperty("idSubValue")
+        private String idSubValue;
+
     }
 
     @Getter
