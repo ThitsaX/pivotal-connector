@@ -110,6 +110,24 @@ public class CoreConnectorConfiguration {
 
         private final int sdkConnectorPortNo;
 
+        // ── FSPIOP JWS (hub-facing leg) ──────────────────────────────────────
+        // Signing is off unless explicitly enabled. It is safe to switch on unilaterally: peers
+        // ignore signatures until they enable verification, so there is no flag day on this side.
+
+        private final boolean fspiopUseJws;
+
+        private final String vaultUrl;
+
+        private final String vaultRole;
+
+        private final String vaultKubernetesAuthPath;
+
+        private final String vaultKvMount;
+
+        private final String vaultJwsKeyPathPrefix;
+
+        private final String vaultServiceAccountTokenPath;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -142,6 +160,16 @@ public class CoreConnectorConfiguration {
             this.redisTtlSeconds = propInt("redisTtlSeconds", 1200);
             this.transactionAmountLimit = propBigDecimal("transactionAmountLimit", BigDecimal.ZERO);
             this.sdkConnectorPortNo = propInt("sdkConnectorPortNo", 8080);
+
+            this.fspiopUseJws = propBoolean("fspiopUseJws", false);
+            this.vaultUrl = prop("vaultUrl", "");
+            this.vaultRole = prop("vaultRole", "");
+            this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
+            this.vaultKvMount = prop("vaultKvMount", "secret");
+            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey");
+            this.vaultServiceAccountTokenPath = prop(
+                "vaultServiceAccountTokenPath",
+                "/var/run/secrets/kubernetes.io/serviceaccount/token");
         }
 
         private static String prop(String key, String def) {
