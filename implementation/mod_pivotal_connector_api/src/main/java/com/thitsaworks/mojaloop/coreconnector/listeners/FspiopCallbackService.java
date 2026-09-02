@@ -17,6 +17,7 @@ package com.thitsaworks.mojaloop.coreconnector.listeners;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
+import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
@@ -63,15 +64,18 @@ public class FspiopCallbackService {
 
     private final ObjectMapper objectMapper;
 
-    public FspiopCallbackService(OkHttpClient http, ObjectMapper objectMapper, FspiopJwsSigner jwsSigner) {
+    public FspiopCallbackService(OkHttpClient http,
+                                 ObjectMapper objectMapper,
+                                 FspiopJwsSigner jwsSigner,
+                                 FspiopMutualTls mutualTls) {
 
-        // Install signing on a derived client rather than expecting the injected one to carry it.
-        // Every deployable connector overrides the framework's sharedOkHttpClient bean with its own,
-        // so a pre-configured client cannot be relied on; newBuilder() shares the connection pool
-        // and dispatcher, so this costs nothing.
-        this.http = http.newBuilder()
-                        .addInterceptor(jwsSigner.interceptor())
-                        .build();
+        // Install signing and the client certificate on a derived client rather than expecting the
+        // injected one to carry them. Every deployable connector overrides the framework's
+        // sharedOkHttpClient bean with its own, so a pre-configured client cannot be relied on;
+        // newBuilder() shares the connection pool and dispatcher, so this costs nothing.
+        this.http = mutualTls.apply(http.newBuilder()
+                                        .addInterceptor(jwsSigner.interceptor()))
+                             .build();
         this.objectMapper = objectMapper;
     }
 

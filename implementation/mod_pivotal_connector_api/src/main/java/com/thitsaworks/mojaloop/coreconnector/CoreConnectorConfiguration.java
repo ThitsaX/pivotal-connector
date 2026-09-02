@@ -128,6 +128,21 @@ public class CoreConnectorConfiguration {
 
         private final String vaultServiceAccountTokenPath;
 
+        // ── FSPIOP mutual TLS (hub-facing leg) ───────────────────────────────
+        // Unlike JWS this cannot be switched on unilaterally: the peer must be listening for TLS
+        // and must already trust the CA that signed this connector's certificate, so enabling it
+        // is coordinated with the Hub rather than done ahead of it.
+
+        private final boolean fspiopUseMutualTls;
+
+        private final String fspiopMtlsCaPath;
+
+        private final String fspiopMtlsClientCertPath;
+
+        private final String fspiopMtlsClientKeyPath;
+
+        private final long fspiopMtlsReloadIntervalMs;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -170,6 +185,12 @@ public class CoreConnectorConfiguration {
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
+
+            this.fspiopUseMutualTls = propBoolean("fspiopUseMutualTls", false);
+            this.fspiopMtlsCaPath = prop("fspiopMtlsCaPath", "");
+            this.fspiopMtlsClientCertPath = prop("fspiopMtlsClientCertPath", "");
+            this.fspiopMtlsClientKeyPath = prop("fspiopMtlsClientKeyPath", "");
+            this.fspiopMtlsReloadIntervalMs = propLong("fspiopMtlsReloadIntervalMs", 60_000L);
         }
 
         private static String prop(String key, String def) {
@@ -200,6 +221,15 @@ public class CoreConnectorConfiguration {
 
             try {
                 return Integer.parseInt(prop(key, String.valueOf(def)));
+            } catch (NumberFormatException e) {
+                return def;
+            }
+        }
+
+        private static long propLong(String key, long def) {
+
+            try {
+                return Long.parseLong(prop(key, String.valueOf(def)));
             } catch (NumberFormatException e) {
                 return def;
             }
