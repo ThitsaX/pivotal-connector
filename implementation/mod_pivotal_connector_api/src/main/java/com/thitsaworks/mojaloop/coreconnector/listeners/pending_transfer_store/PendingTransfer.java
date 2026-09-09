@@ -17,15 +17,14 @@ package com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store;
 
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Money;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Party;
 
-public record PendingTransfer(String payeeMobile,
-                              String payerMobile,
+public record PendingTransfer(Party payer,
+                              Party payee,
                               String amount,
                               Money payeeReceiveAmount,
                               String currency,
                               String homeTransactionId,
-                              String payerFspId,
-                              String payeeFspId,
                               String subScenario,
                               String note,
                               ExtensionList extensionList) { }

@@ -209,14 +209,12 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             String homeTransactionId = reserveTransfer(agreement, request);
 
             pendingStore.set(transferId,
-                             new PendingTransfer(payeeMobile,
-                                                 payerMobile,
+                             new PendingTransfer(agreement.payer(),
+                                                 agreement.payee(),
                                                  amount,
                                                  agreement.payeeReceiveAmount(),
                                                  currency,
                                                  homeTransactionId,
-                                                 request.getPayerFsp(),
-                                                 request.getPayeeFsp(),
                                                  agreement.subScenario(),
                                                  agreement.note(),
                                                  request.getExtensionList()));

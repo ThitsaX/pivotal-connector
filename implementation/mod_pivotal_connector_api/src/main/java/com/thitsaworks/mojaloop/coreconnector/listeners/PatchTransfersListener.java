@@ -28,8 +28,10 @@ import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationRespo
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Money;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Party;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyComplexName;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdInfo;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyIdType;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartyPersonalInfo;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPatchResponse;
 import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.PendingTransfer;
 import com.thitsaworks.mojaloop.coreconnector.listeners.pending_transfer_store.PendingTransfersStore;
@@ -150,14 +152,12 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
             }
             StateEnum confirmationState = confirmationState(transferState);
             String confirmedHomeTransactionId = confirmTransfer(transferId,
-                                                                pending.payeeMobile(),
-                                                                pending.payerMobile(),
+                                                                pending.payer(),
+                                                                pending.payee(),
                                                                 pending.amount(),
                                                                 pending.payeeReceiveAmount(),
                                                                 pending.currency(),
                                                                 pending.homeTransactionId(),
-                                                                pending.payerFspId(),
-                                                                pending.payeeFspId(),
                                                                 pending.subScenario(),
                                                                 pending.note(),
                                                                 confirmationState,
@@ -169,7 +169,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
             LOG.info("patchTransfers CONFIRMED transferId={} payeeMobile={} amount={} {} homeTransactionId={}",
                      transferId,
-                     pending.payeeMobile(),
+                     pending.payee().getPartyIdInfo().getPartyIdentifier(),
                      pending.amount(),
                      pending.currency(),
                      confirmedHomeTransactionId);
@@ -189,14 +189,12 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
     }
 
     private String confirmTransfer(String transferId,
-                                   String payeeMobile,
-                                   String payerMobile,
+                                   Party payer,
+                                   Party payee,
                                    String amount,
                                    Money payeeReceiveAmount,
                                    String currency,
                                    String homeTransactionId,
-                                   String payerFspId,
-                                   String payeeFspId,
                                    String subScenario,
                                    String note,
                                    StateEnum confirmationState,
@@ -205,7 +203,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         LOG.info(
             "confirmTransfer transferId={} payeeMobile={} amount={} payeeReceiveAmount={} homeTransactionId={} state={}",
             transferId,
-            payeeMobile,
+            payee.getPartyIdInfo().getPartyIdentifier(),
             amount,
             payeeReceiveAmount.getAmount(),
             homeTransactionId,
@@ -216,13 +214,11 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         ConfirmationForTransfer.Request request = new ConfirmationForTransfer.Request();
         request.setTransferId(transferId);
         request.setHomeTransactionId(homeTransactionId);
-        request.setQuoteRequest(quoteRequest(payeeMobile,
-                                             payerMobile,
+        request.setQuoteRequest(quoteRequest(payer,
+                                             payee,
                                              amount,
                                              payeeReceiveAmount,
                                              currency,
-                                             payerFspId,
-                                             payeeFspId,
                                              subScenario,
                                              note));
         request.setQuote(quote(extensionList));
@@ -280,7 +276,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         try {
             Map<String, Object> context = new LinkedHashMap<>();
             context.put("transferId", msg.getTransferId());
-            context.put("payeeMobile", pending.payeeMobile());
+            context.put("payeeMobile", pending.payee().getPartyIdInfo().getPartyIdentifier());
             context.put("amount", pending.amount());
             context.put("currency", pending.currency());
 
@@ -307,7 +303,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
             auditPublisher.publishPatchSuccess(
                     new AuditPublisherService.PatchSuccessInput(
                             msg.getTransferId(), msg.getPayerFsp(), msg.getPayeeFsp(),
-                            pending.payeeMobile(), pending.amount(), homeTransactionId));
+                            pending.payee().getPartyIdInfo().getPartyIdentifier(), pending.amount(), homeTransactionId));
             LOG.info("publishPatchSuccessAudit for homeTransctionId :{}", homeTransactionId);
         } catch (Exception publishErr) {
             LOG.error(
@@ -317,19 +313,17 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
     }
 
 
-    private ConfirmationForTransfer.QuoteRequest quoteRequest(String payeeMobile,
-                                                              String payerMobile,
+    private ConfirmationForTransfer.QuoteRequest quoteRequest(Party payer,
+                                                              Party payee,
                                                               String amount,
                                                               Money payeeReceiveAmount,
                                                               String currency,
-                                                              String payerFspId,
-                                                              String payeeFspId,
                                                               String subScenario,
                                                               String note) {
 
         ConfirmationForTransfer.Body body = new ConfirmationForTransfer.Body();
-        body.setPayer(party(payerMobile, payerFspId));
-        body.setPayee(party(payeeMobile, payeeFspId));
+        body.setPayer(payer);
+        body.setPayee(payee);
         body.setAmount(amount(amount, currency));
         body.setPayeeReceiveAmount(new BigDecimal(payeeReceiveAmount.getAmount()));
         body.setTransactionType(transactionType(subScenario));
@@ -344,17 +338,6 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         ConfirmationForTransfer.TransactionType transactionType = new ConfirmationForTransfer.TransactionType();
         transactionType.setSubScenario(subScenario);
         return transactionType;
-    }
-
-    private Party party(String identifier, String fspId) {
-
-        PartyIdInfo partyIdInfo = new PartyIdInfo();
-        partyIdInfo.setPartyIdentifier(identifier);
-        partyIdInfo.setFspId(fspId);
-
-        Party party = new Party();
-        party.setPartyIdInfo(partyIdInfo);
-        return party;
     }
 
     private ConfirmationForTransfer.Quote quote(ExtensionList extensionList) {
