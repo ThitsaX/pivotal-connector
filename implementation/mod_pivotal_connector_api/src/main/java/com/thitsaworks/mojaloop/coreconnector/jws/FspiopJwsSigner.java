@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.jws;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.FspiopSigningInterceptor;
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.JwsKeyProvider;
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.StaticJwsKeyProvider;
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.VaultJwsKeyProvider;
-import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultClient;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.StaticJwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.VaultJwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.vault.Vault;
 import okhttp3.Interceptor;
-import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -49,21 +48,16 @@ public class FspiopJwsSigner implements InitializingBean {
 
     private final CoreConnectorConfiguration.Settings config;
 
-    private final OkHttpClient http;
-
-    private final ObjectMapper objectMapper;
+    private final Vault vault;
 
     private JwsKeyProvider keyProvider;
 
     private Interceptor interceptor;
 
-    public FspiopJwsSigner(CoreConnectorConfiguration.Settings config,
-                           OkHttpClient http,
-                           ObjectMapper objectMapper) {
+    public FspiopJwsSigner(CoreConnectorConfiguration.Settings config, Vault vault) {
 
         this.config = config;
-        this.http = http;
-        this.objectMapper = objectMapper;
+        this.vault = vault;
     }
 
     @Override
@@ -71,29 +65,22 @@ public class FspiopJwsSigner implements InitializingBean {
 
         if (!this.config.isFspiopUseJws()) {
             LOG.info("FSPIOP JWS signing is disabled; outbound callbacks will be sent unsigned.");
-            this.interceptor = new FspiopSigningInterceptor(new StaticJwsKeyProvider(this.config.getConnectorId(), null), false);
+            this.interceptor = new FspiopSigningInterceptor(
+                new StaticJwsKeyProvider(this.config.getConnectorId(), null), false);
             return;
         }
 
-        VaultClient.Settings vaultSettings = new VaultClient.Settings(
-            this.config.getVaultUrl(),
-            this.config.getVaultRole(),
-            this.config.getVaultKubernetesAuthPath(),
-            this.config.getVaultKvMount(),
-            this.config.getVaultServiceAccountTokenPath());
-
-        if (!vaultSettings.isConfigured()) {
+        if (!this.vault.isConfigured()) {
             // Enabling signing without somewhere to get a key is a misconfiguration, not a state to
             // degrade through: it would send unsigned traffic while the operator believed otherwise.
             throw new IllegalStateException(
                 "fspiopUseJws is enabled but Vault is not configured. Set vaultUrl and vaultRole.");
         }
 
-        VaultClient vaultClient = new VaultClient(this.http, this.objectMapper, vaultSettings);
+        this.keyProvider = new VaultJwsKeyProvider(
+            this.vault, this.config.getConnectorId(),
+            this.config.getVaultJwsKeyPathPrefix());
 
-        this.keyProvider = new VaultJwsKeyProvider(vaultClient,
-                                                   this.config.getConnectorId(),
-                                                   this.config.getVaultJwsKeyPathPrefix());
         this.keyProvider.refresh();
 
         this.interceptor = new FspiopSigningInterceptor(this.keyProvider, true);

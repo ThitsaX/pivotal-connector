@@ -17,6 +17,7 @@ package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.StaticJwsKeyProvider;
 import okhttp3.Call;
 import okhttp3.Connection;
 import okhttp3.Interceptor;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
+package com.thitsaworks.mojaloop.coreconnector.component.util;
 
 import java.security.GeneralSecurityException;
 import java.security.KeyFactory;

@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector;
 
 import com.thitsaworks.mojaloop.coreconnector.component.ComponentConfiguration;
+import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import lombok.Getter;
 import okhttp3.OkHttpClient;
@@ -33,7 +35,10 @@ import java.util.Locale;
 
 @Configuration
 @ComponentScan("com.thitsaworks.mojaloop.coreconnector")
-@Import(ComponentConfiguration.class)
+@Import(
+    {
+        ComponentConfiguration.class,
+        VaultConfiguration.class})
 public class CoreConnectorConfiguration {
 
     @Bean
@@ -57,6 +62,15 @@ public class CoreConnectorConfiguration {
                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                    .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                    .build();
+    }
+
+    @Bean
+    public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+
+        return new VaultConfiguration.Settings(
+            connectorSettings.getVaultUrl(), connectorSettings.getVaultRole(),
+            connectorSettings.getVaultKubernetesAuthPath(), connectorSettings.getVaultKvMount(),
+            connectorSettings.getVaultServiceAccountTokenPath());
     }
 
     @Getter
@@ -279,12 +293,9 @@ public class CoreConnectorConfiguration {
 
         private static String normalizePropertyKey(String key) {
 
-            return key.replace("_", "")
-                      .replace("-", "")
-                      .toLowerCase(Locale.ROOT);
+            return key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
         }
 
     }
 
 }
-

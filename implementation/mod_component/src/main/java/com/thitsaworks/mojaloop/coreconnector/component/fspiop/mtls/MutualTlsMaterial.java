@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.mtls;
 
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.Pem;
+import com.thitsaworks.mojaloop.coreconnector.component.util.Pem;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -86,8 +87,8 @@ public final class MutualTlsMaterial {
 
         if (chain.isEmpty() != (key == null)) {
             throw new IllegalStateException(
-                "A client certificate and its private key must be configured together; "
-                    + "half a pair cannot complete a handshake.");
+                "A client certificate and its private key must be configured together; " +
+                    "half a pair cannot complete a handshake.");
         }
 
         return new MutualTlsMaterial(chain, key, anchors, fingerprint(caPem, certPem, keyPem));
@@ -138,7 +139,8 @@ public final class MutualTlsMaterial {
         try {
             return Files.readString(Path.of(path.trim()), StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new IllegalStateException("Could not read the " + what + " at '" + path + "'.", e);
+            throw new IllegalStateException(
+                "Could not read the " + what + " at '" + path + "'.", e);
         }
     }
 
@@ -147,7 +149,8 @@ public final class MutualTlsMaterial {
         try {
             CertificateFactory factory = CertificateFactory.getInstance("X.509");
             Collection<? extends Certificate> parsed = factory.generateCertificates(
-                new ByteArrayInputStream(pem.replace("\\n", "\n").getBytes(StandardCharsets.UTF_8)));
+                new ByteArrayInputStream(
+                    pem.replace("\\n", "\n").getBytes(StandardCharsets.UTF_8)));
 
             List<X509Certificate> certificates = new ArrayList<>(parsed.size());
             for (Certificate certificate : parsed) {
@@ -160,7 +163,8 @@ public final class MutualTlsMaterial {
 
             return List.copyOf(certificates);
         } catch (CertificateException e) {
-            throw new IllegalStateException("The configured PEM does not hold valid X.509 certificates.", e);
+            throw new IllegalStateException(
+                "The configured PEM does not hold valid X.509 certificates.", e);
         }
     }
 
@@ -192,6 +196,7 @@ public final class MutualTlsMaterial {
 
             return value != null && !value.isBlank();
         }
+
     }
 
 }
