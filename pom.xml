@@ -28,7 +28,7 @@
     </modules>
 
     <properties>
-        <revision>0.0.26</revision>
+        <revision>0.0.27</revision>
         <java.version>21</java.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
@@ -39,6 +39,7 @@
         <spring-boot.version>3.2.0</spring-boot.version>
         <jackson.version>2.17.2</jackson.version>
         <nats.version>2.16.0</nats.version>
+        <kafka.version>3.6.2</kafka.version>
         <commons-lang3-version>3.18.0</commons-lang3-version>
 
         <!-- FSPIOP Interface -->
@@ -116,6 +117,13 @@
                 <groupId>io.nats</groupId>
                 <artifactId>jnats</artifactId>
                 <version>${nats.version}</version>
+            </dependency>
+
+            <!-- Kafka -->
+            <dependency>
+                <groupId>org.apache.kafka</groupId>
+                <artifactId>kafka-clients</artifactId>
+                <version>${kafka.version}</version>
             </dependency>
 
             <!-- Lombok -->

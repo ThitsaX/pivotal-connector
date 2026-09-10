@@ -31,6 +31,7 @@ import com.thitsaworks.mojaloop.coreconnector.nats.NatsService;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostQuotesNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.services.FspClientService;
+import com.thitsaworks.mojaloop.coreconnector.tazama.ConnectorToTazamaPublisher;
 import io.nats.client.JetStreamManagement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +58,8 @@ public class QuotesListener implements InitializingBean, DisposableBean {
 
     private final ObjectMapper objectMapper;
 
+    private final ConnectorToTazamaPublisher connectorToTazamaPublisher;
+
     private NatsPullListener<PostQuotesNatsMessage> listener;
 
     public QuotesListener(NatsService natsService,
@@ -65,7 +68,8 @@ public class QuotesListener implements InitializingBean, DisposableBean {
                           FspClientService fspClientService,
                           CoreConnectorConfiguration.Settings config,
                           PostQuoteMapper quotesResponseMapper,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          ConnectorToTazamaPublisher connectorToTazamaPublisher) {
 
         this.natsService = natsService;
         this.callback = callback;
@@ -74,6 +78,7 @@ public class QuotesListener implements InitializingBean, DisposableBean {
         this.config = config;
         this.quotesResponseMapper = quotesResponseMapper;
         this.objectMapper = objectMapper;
+        this.connectorToTazamaPublisher = connectorToTazamaPublisher;
     }
 
     @Override
@@ -147,6 +152,8 @@ public class QuotesListener implements InitializingBean, DisposableBean {
                                    .getErrorInformation();
                 throw new PostQuoteException(errorInformation.getStatusCode(), errorInformation.getMessage());
             }
+
+            connectorToTazamaPublisher.publishQuoteResponse(responseFromFsp.getQuoteId(), responseFromFsp);
 
             LOG.info("Quote response from Payee for TransferId {} : {}",
                      request.getTransactionId(),
