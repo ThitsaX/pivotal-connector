@@ -60,6 +60,10 @@
             <artifactId>spring-test</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.springframework.vault</groupId>
+            <artifactId>spring-vault-core</artifactId>
+        </dependency>
+        <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
             <scope>provided</scope>
@@ -177,5 +181,17 @@
             <groupId>org.apache.tomcat.embed</groupId>
             <artifactId>tomcat-embed-core</artifactId>
         </dependency>
+        <!--
+            Test scope only, and deliberately so: the JDK can read X.509 but cannot create it, and
+            these tests need a real certificate authority to prove a handshake. Nothing here reaches
+            the shipped artifact, which stays free of BouncyCastle; see Pem for why that matters.
+        -->
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+            <version>1.78.1</version>
+            <scope>test</scope>
+        </dependency>
+
     </dependencies>
 </project>

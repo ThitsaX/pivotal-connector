@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector;
 
 import com.thitsaworks.mojaloop.coreconnector.component.ComponentConfiguration;
+import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import lombok.Getter;
 import okhttp3.OkHttpClient;
@@ -33,7 +35,10 @@ import java.util.Locale;
 
 @Configuration
 @ComponentScan("com.thitsaworks.mojaloop.coreconnector")
-@Import(ComponentConfiguration.class)
+@Import(
+    {
+        ComponentConfiguration.class,
+        VaultConfiguration.class})
 public class CoreConnectorConfiguration {
 
     @Bean
@@ -57,6 +62,15 @@ public class CoreConnectorConfiguration {
                    .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                    .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
                    .build();
+    }
+
+    @Bean
+    public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+
+        return new VaultConfiguration.Settings(
+            connectorSettings.getVaultUrl(), connectorSettings.getVaultRole(),
+            connectorSettings.getVaultKubernetesAuthPath(), connectorSettings.getVaultKvMount(),
+            connectorSettings.getVaultServiceAccountTokenPath());
     }
 
     @Getter
@@ -110,6 +124,39 @@ public class CoreConnectorConfiguration {
 
         private final int sdkConnectorPortNo;
 
+        // ── FSPIOP JWS (hub-facing leg) ──────────────────────────────────────
+        // Signing is off unless explicitly enabled. It is safe to switch on unilaterally: peers
+        // ignore signatures until they enable verification, so there is no flag day on this side.
+
+        private final boolean fspiopUseJws;
+
+        private final String vaultUrl;
+
+        private final String vaultRole;
+
+        private final String vaultKubernetesAuthPath;
+
+        private final String vaultKvMount;
+
+        private final String vaultJwsKeyPathPrefix;
+
+        private final String vaultServiceAccountTokenPath;
+
+        // ── FSPIOP mutual TLS (hub-facing leg) ───────────────────────────────
+        // Unlike JWS this cannot be switched on unilaterally: the peer must be listening for TLS
+        // and must already trust the CA that signed this connector's certificate, so enabling it
+        // is coordinated with the Hub rather than done ahead of it.
+
+        private final boolean fspiopUseMutualTls;
+
+        private final String fspiopMtlsCaPath;
+
+        private final String fspiopMtlsClientCertPath;
+
+        private final String fspiopMtlsClientKeyPath;
+
+        private final long fspiopMtlsReloadIntervalMs;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -142,6 +189,22 @@ public class CoreConnectorConfiguration {
             this.redisTtlSeconds = propInt("redisTtlSeconds", 1200);
             this.transactionAmountLimit = propBigDecimal("transactionAmountLimit", BigDecimal.ZERO);
             this.sdkConnectorPortNo = propInt("sdkConnectorPortNo", 8080);
+
+            this.fspiopUseJws = propBoolean("fspiopUseJws", false);
+            this.vaultUrl = prop("vaultUrl", "");
+            this.vaultRole = prop("vaultRole", "");
+            this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
+            this.vaultKvMount = prop("vaultKvMount", "secret");
+            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey");
+            this.vaultServiceAccountTokenPath = prop(
+                "vaultServiceAccountTokenPath",
+                "/var/run/secrets/kubernetes.io/serviceaccount/token");
+
+            this.fspiopUseMutualTls = propBoolean("fspiopUseMutualTls", false);
+            this.fspiopMtlsCaPath = prop("fspiopMtlsCaPath", "");
+            this.fspiopMtlsClientCertPath = prop("fspiopMtlsClientCertPath", "");
+            this.fspiopMtlsClientKeyPath = prop("fspiopMtlsClientKeyPath", "");
+            this.fspiopMtlsReloadIntervalMs = propLong("fspiopMtlsReloadIntervalMs", 60_000L);
         }
 
         private static String prop(String key, String def) {
@@ -172,6 +235,15 @@ public class CoreConnectorConfiguration {
 
             try {
                 return Integer.parseInt(prop(key, String.valueOf(def)));
+            } catch (NumberFormatException e) {
+                return def;
+            }
+        }
+
+        private static long propLong(String key, long def) {
+
+            try {
+                return Long.parseLong(prop(key, String.valueOf(def)));
             } catch (NumberFormatException e) {
                 return def;
             }
@@ -221,12 +293,9 @@ public class CoreConnectorConfiguration {
 
         private static String normalizePropertyKey(String key) {
 
-            return key.replace("_", "")
-                      .replace("-", "")
-                      .toLowerCase(Locale.ROOT);
+            return key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
         }
 
     }
 
 }
-
