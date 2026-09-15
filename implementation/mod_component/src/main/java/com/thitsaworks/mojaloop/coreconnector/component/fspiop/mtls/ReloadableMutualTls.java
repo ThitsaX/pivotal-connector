@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.mtls;
 
 import org.slf4j.Logger;
@@ -88,14 +89,14 @@ public final class ReloadableMutualTls {
 
         if (!material.hasClientCertificate()) {
             throw new IllegalStateException(
-                "Mutual TLS is enabled but no client certificate is configured. "
-                    + "Set fspiopMtlsClientCertPath and fspiopMtlsClientKeyPath.");
+                "Mutual TLS is enabled but no client certificate is configured. " +
+                    "Set fspiopMtlsClientCertPath and fspiopMtlsClientKeyPath.");
         }
 
         if (!material.hasTrustAnchors()) {
             throw new IllegalStateException(
-                "Mutual TLS is enabled but no certificate authority is configured, so the peer "
-                    + "could not be verified. Set fspiopMtlsCaPath.");
+                "Mutual TLS is enabled but no certificate authority is configured, so the peer " +
+                    "could not be verified. Set fspiopMtlsCaPath.");
         }
 
         ReloadableMutualTls reloadable = new ReloadableMutualTls(settings);
@@ -146,7 +147,9 @@ public final class ReloadableMutualTls {
 
             return true;
         } catch (RuntimeException | GeneralSecurityException e) {
-            LOG.error("Could not reload mutual TLS material; keeping the current one: {}", e.getMessage());
+            LOG.error(
+                "Could not reload mutual TLS material; keeping the current one: {}",
+                e.getMessage());
 
             return false;
         }
@@ -162,9 +165,9 @@ public final class ReloadableMutualTls {
             // The delegating managers close over this instance, so the socket factory built here
             // reads whatever a later reload puts into those references.
             SSLContext context = SSLContext.getInstance("TLS");
-            context.init(new KeyManager[]{new DelegatingKeyManager()},
-                         new TrustManager[]{this.delegatingTrustManager},
-                         new SecureRandom());
+            context.init(
+                new KeyManager[]{new DelegatingKeyManager()},
+                new TrustManager[]{this.delegatingTrustManager}, new SecureRandom());
 
             this.socketFactory = context.getSocketFactory();
         } catch (GeneralSecurityException e) {
@@ -178,13 +181,12 @@ public final class ReloadableMutualTls {
         try {
             KeyStore store = KeyStore.getInstance("PKCS12");
             store.load(null, null);
-            store.setKeyEntry("client",
-                              material.clientKey(),
-                              KEY_STORE_PASSWORD,
-                              material.clientChain().toArray(new X509Certificate[0]));
+            store.setKeyEntry(
+                "client", material.clientKey(), KEY_STORE_PASSWORD,
+                material.clientChain().toArray(new X509Certificate[0]));
 
-            KeyManagerFactory factory =
-                KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            KeyManagerFactory factory = KeyManagerFactory.getInstance(
+                KeyManagerFactory.getDefaultAlgorithm());
             factory.init(store, KEY_STORE_PASSWORD);
 
             for (KeyManager manager : factory.getKeyManagers()) {
@@ -211,8 +213,8 @@ public final class ReloadableMutualTls {
                 store.setCertificateEntry("ca-" + index, anchors.get(index));
             }
 
-            TrustManagerFactory factory =
-                TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory factory = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
             factory.init(store);
 
             for (TrustManager manager : factory.getTrustManagers()) {
@@ -244,13 +246,19 @@ public final class ReloadableMutualTls {
         @Override
         public String chooseClientAlias(String[] keyType, Principal[] issuers, Socket socket) {
 
-            return ReloadableMutualTls.this.keyManager.get().chooseClientAlias(keyType, issuers, socket);
+            return ReloadableMutualTls.this.keyManager
+                       .get()
+                       .chooseClientAlias(keyType, issuers, socket);
         }
 
         @Override
-        public String chooseEngineClientAlias(String[] keyType, Principal[] issuers, SSLEngine engine) {
+        public String chooseEngineClientAlias(String[] keyType,
+                                              Principal[] issuers,
+                                              SSLEngine engine) {
 
-            return ReloadableMutualTls.this.keyManager.get().chooseEngineClientAlias(keyType, issuers, engine);
+            return ReloadableMutualTls.this.keyManager
+                       .get()
+                       .chooseEngineClientAlias(keyType, issuers, engine);
         }
 
         @Override
@@ -262,13 +270,19 @@ public final class ReloadableMutualTls {
         @Override
         public String chooseServerAlias(String keyType, Principal[] issuers, Socket socket) {
 
-            return ReloadableMutualTls.this.keyManager.get().chooseServerAlias(keyType, issuers, socket);
+            return ReloadableMutualTls.this.keyManager
+                       .get()
+                       .chooseServerAlias(keyType, issuers, socket);
         }
 
         @Override
-        public String chooseEngineServerAlias(String keyType, Principal[] issuers, SSLEngine engine) {
+        public String chooseEngineServerAlias(String keyType,
+                                              Principal[] issuers,
+                                              SSLEngine engine) {
 
-            return ReloadableMutualTls.this.keyManager.get().chooseEngineServerAlias(keyType, issuers, engine);
+            return ReloadableMutualTls.this.keyManager
+                       .get()
+                       .chooseEngineServerAlias(keyType, issuers, engine);
         }
 
         @Override
@@ -282,13 +296,15 @@ public final class ReloadableMutualTls {
 
             return ReloadableMutualTls.this.keyManager.get().getPrivateKey(alias);
         }
+
     }
 
     /** Forwards every call to whichever trust manager is current. */
     private final class DelegatingTrustManager extends X509ExtendedTrustManager {
 
         @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+        public void checkClientTrusted(X509Certificate[] chain, String authType)
+            throws CertificateException {
 
             ReloadableMutualTls.this.trustManager.get().checkClientTrusted(chain, authType);
         }
@@ -308,7 +324,8 @@ public final class ReloadableMutualTls {
         }
 
         @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+        public void checkServerTrusted(X509Certificate[] chain, String authType)
+            throws CertificateException {
 
             ReloadableMutualTls.this.trustManager.get().checkServerTrusted(chain, authType);
         }
@@ -332,6 +349,7 @@ public final class ReloadableMutualTls {
 
             return ReloadableMutualTls.this.trustManager.get().getAcceptedIssuers();
         }
+
     }
 
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -61,11 +62,13 @@ public final class FspiopProtectedHeader {
     public static Map<String, String> build(Input input) {
 
         if (isBlank(input.source())) {
-            throw new IllegalArgumentException("Cannot build the FSPIOP protected header: fspiop-source is required.");
+            throw new IllegalArgumentException(
+                "Cannot build the FSPIOP protected header: fspiop-source is required.");
         }
 
         if (isBlank(input.method())) {
-            throw new IllegalArgumentException("Cannot build the FSPIOP protected header: the HTTP method is required.");
+            throw new IllegalArgumentException(
+                "Cannot build the FSPIOP protected header: the HTTP method is required.");
         }
 
         // Insertion order is the serialization order, and the serialization is what gets signed.
@@ -73,8 +76,7 @@ public final class FspiopProtectedHeader {
 
         fields.put("alg", input.algorithm() == null ? DEFAULT_ALGORITHM : input.algorithm());
         fields.put("FSPIOP-URI", FspiopUri.extract(input.uri()));
-        fields.put("FSPIOP-HTTP-Method", input.method()
-                                              .toUpperCase(Locale.ROOT));
+        fields.put("FSPIOP-HTTP-Method", input.method().toUpperCase(Locale.ROOT));
         fields.put("FSPIOP-Source", input.source());
 
         if (!isBlank(input.destination())) {
@@ -123,6 +125,7 @@ public final class FspiopProtectedHeader {
 
             this(method, uri, source, destination, date, DEFAULT_ALGORITHM);
         }
+
     }
 
 }

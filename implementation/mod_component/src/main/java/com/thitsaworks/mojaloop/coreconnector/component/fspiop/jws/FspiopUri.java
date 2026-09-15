@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
 
 import java.util.List;
@@ -49,20 +50,11 @@ public final class FspiopUri {
      * path. That is the intended failure mode.
      */
     public static final List<String> RESOURCES = List.of(
-        "participants",
-        "parties",
-        "quotes",
-        "transfers",
-        "transactionRequests",
-        "authorizations",
-        "bulkQuotes",
-        "bulkTransfers",
-        "fxQuotes",
-        "fxTransfers",
-        "services",
-        "transactions");
+        "participants", "parties", "quotes", "transfers", "transactionRequests", "authorizations",
+        "bulkQuotes", "bulkTransfers", "fxQuotes", "fxTransfers", "services", "transactions");
 
-    private static final Pattern PATTERN = Pattern.compile("/(?:" + String.join("|", RESOURCES) + ")(?:/|$)");
+    private static final Pattern PATTERN = Pattern.compile(
+        "/(?:" + String.join("|", RESOURCES) + ")(?:/|$)");
 
     private static final String SCHEME_SEPARATOR = "://";
 
@@ -78,17 +70,19 @@ public final class FspiopUri {
     public static String extract(String requestUrl) {
 
         if (requestUrl == null || requestUrl.isBlank()) {
-            throw new IllegalArgumentException("Cannot derive FSPIOP-URI: the request URL is empty.");
+            throw new IllegalArgumentException(
+                "Cannot derive FSPIOP-URI: the request URL is empty.");
         }
 
         String path = toPath(requestUrl);
         Matcher matcher = PATTERN.matcher(path);
 
         if (!matcher.find()) {
-            throw new IllegalArgumentException(
-                "Cannot derive FSPIOP-URI from '" + requestUrl + "': the path contains no known FSPIOP "
-                    + "resource name. Known resources: " + String.join(", ", RESOURCES) + ". "
-                    + "Add the resource to FspiopUri.RESOURCES if this path is legitimate.");
+            throw new IllegalArgumentException("Cannot derive FSPIOP-URI from '" + requestUrl +
+                                                   "': the path contains no known FSPIOP " +
+                                                   "resource name. Known resources: " +
+                                                   String.join(", ", RESOURCES) + ". " +
+                                                   "Add the resource to FspiopUri.RESOURCES if this path is legitimate.");
         }
 
         return path.substring(matcher.start());

@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
+package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key;
 
-import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultClient;
+import com.thitsaworks.mojaloop.coreconnector.component.util.Pem;
+import com.thitsaworks.mojaloop.coreconnector.component.vault.Vault;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,9 +41,7 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(VaultJwsKeyProvider.class);
 
-    private static final String KEY_FIELD = "privateKey";
-
-    private final VaultClient vaultClient;
+    private final Vault vault;
 
     private final String fspId;
 
@@ -50,9 +49,9 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
 
     private volatile PrivateKey signingKey;
 
-    public VaultJwsKeyProvider(VaultClient vaultClient, String fspId, String keyPathPrefix) {
+    public VaultJwsKeyProvider(Vault vault, String fspId, String keyPathPrefix) {
 
-        this.vaultClient = vaultClient;
+        this.vault = vault;
         this.fspId = fspId;
         this.keyPathPrefix = keyPathPrefix;
     }
@@ -79,20 +78,20 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
     public void refresh() {
 
         String path = this.keyPathPrefix + "/" + this.fspId;
-        String token = this.vaultClient.login();
+        Optional<JwsKeySecret> secret = this.vault.get(path, JwsKeySecret.class);
 
-        Optional<String> pem = this.vaultClient.readKvField(token, path, KEY_FIELD);
-
-        if (pem.isEmpty()) {
+        if (secret.isEmpty() || secret.get().privateKey() == null || secret.get().privateKey().isBlank()) {
             this.signingKey = null;
-            LOG.warn("No JWS signing key at Vault path '{}' field '{}'. Outbound FSPIOP callbacks "
-                         + "will be sent unsigned.", path, KEY_FIELD);
+            LOG.warn("No JWS signing key at Vault path '{}'. Outbound FSPIOP callbacks will be sent unsigned.",
+                     path);
             return;
         }
 
-        this.signingKey = Pem.readPrivateKey(pem.get());
+        this.signingKey = Pem.readPrivateKey(secret.get().privateKey());
 
         LOG.info("Loaded the JWS signing key for '{}' from Vault path '{}'", this.fspId, path);
     }
+
+    private record JwsKeySecret(String privateKey) { }
 
 }

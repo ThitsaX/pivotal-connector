@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -60,8 +61,7 @@ public final class FspiopSignature {
 
     private static final String JCA_ALGORITHM = "SHA256withRSA";
 
-    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder()
-                                                        .withoutPadding();
+    private static final Base64.Encoder ENCODER = Base64.getUrlEncoder().withoutPadding();
 
     private static final Base64.Decoder DECODER = Base64.getUrlDecoder();
 
@@ -77,12 +77,14 @@ public final class FspiopSignature {
      * @param input      request metadata bound into the protected header
      * @param payload    the exact request body bytes that will be transmitted
      */
-    public static Header sign(PrivateKey privateKey, FspiopProtectedHeader.Input input, byte[] payload) {
+    public static Header sign(PrivateKey privateKey,
+                              FspiopProtectedHeader.Input input,
+                              byte[] payload) {
 
         assertSupported(input.algorithm());
 
-        String protectedHeader = encode(FspiopProtectedHeader.serialize(input)
-                                                             .getBytes(StandardCharsets.UTF_8));
+        String protectedHeader = encode(
+            FspiopProtectedHeader.serialize(input).getBytes(StandardCharsets.UTF_8));
         String encodedPayload = encode(payload);
 
         try {
@@ -106,8 +108,7 @@ public final class FspiopSignature {
     public static boolean verify(PublicKey publicKey, Header header, byte[] payload) {
 
         try {
-            assertSupported(decodeProtectedHeader(header.protectedHeader())
-                                .get("alg"));
+            assertSupported(decodeProtectedHeader(header.protectedHeader()).get("alg"));
 
             Signature signature = Signature.getInstance(JCA_ALGORITHM);
             signature.initVerify(publicKey);
@@ -130,7 +131,8 @@ public final class FspiopSignature {
 
             return fields;
         } catch (JsonProcessingException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("FSPIOP protected header must decode to a JSON object.", e);
+            throw new IllegalArgumentException(
+                "FSPIOP protected header must decode to a JSON object.", e);
         }
     }
 
@@ -148,7 +150,8 @@ public final class FspiopSignature {
 
         if (algorithm != null && !SIGNING_ALGORITHM.equals(algorithm)) {
             throw new IllegalArgumentException(
-                "Unsupported FSPIOP signing algorithm '" + algorithm + "'. Supported: " + SIGNING_ALGORITHM + ".");
+                "Unsupported FSPIOP signing algorithm '" + algorithm + "'. Supported: " +
+                    SIGNING_ALGORITHM + ".");
         }
     }
 
@@ -169,9 +172,11 @@ public final class FspiopSignature {
 
                 return MAPPER.writeValueAsString(value);
             } catch (JsonProcessingException e) {
-                throw new IllegalStateException("Failed to serialize the fspiop-signature header.", e);
+                throw new IllegalStateException(
+                    "Failed to serialize the fspiop-signature header.", e);
             }
         }
+
     }
 
 }

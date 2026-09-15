@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws;
 
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
 import okhttp3.Interceptor;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -105,27 +107,23 @@ public class FspiopSigningInterceptor implements Interceptor {
             return chain.proceed(request);
         }
 
-        String uri = FspiopUri.extract(request.url()
-                                              .toString());
-        String method = request.method()
-                               .toUpperCase(java.util.Locale.ROOT);
+        String uri = FspiopUri.extract(request.url().toString());
+        String method = request.method().toUpperCase(java.util.Locale.ROOT);
 
         FspiopSignature.Header signature = FspiopSignature.sign(
             privateKey,
-            new FspiopProtectedHeader.Input(method,
-                                            uri,
-                                            source,
-                                            request.header(FSPIOP_DESTINATION),
-                                            request.header(DATE)),
+            new FspiopProtectedHeader.Input(
+                method, uri, source, request.header(FSPIOP_DESTINATION), request.header(DATE)),
             payload);
 
         LOG.debug("Signed {} {} as '{}'", method, uri, source);
 
-        return chain.proceed(request.newBuilder()
-                                    .header(FSPIOP_URI, uri)
-                                    .header(FSPIOP_HTTP_METHOD, method)
-                                    .header(FSPIOP_SIGNATURE, signature.toHeaderValue())
-                                    .build());
+        return chain.proceed(request
+                                 .newBuilder()
+                                 .header(FSPIOP_URI, uri)
+                                 .header(FSPIOP_HTTP_METHOD, method)
+                                 .header(FSPIOP_SIGNATURE, signature.toHeaderValue())
+                                 .build());
     }
 
     /**

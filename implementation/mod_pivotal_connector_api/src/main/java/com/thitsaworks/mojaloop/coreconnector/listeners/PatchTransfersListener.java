@@ -42,6 +42,7 @@ import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForT
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PatchTransfersNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.services.FspClientService;
 import com.thitsaworks.mojaloop.coreconnector.tazama.ConnectorToTazamaPublisher;
+import com.thitsaworks.mojaloop.coreconnector.tazama.payload.TazamaPayloadBuilder;
 import io.nats.client.JetStreamManagement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,6 +77,8 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
     private final ConnectorToTazamaPublisher connectorToTazamaPublisher;
 
+    private final TazamaPayloadBuilder tazamaPayloadBuilder;
+
     private NatsPullListener<PatchTransfersNatsMessage> listener;
 
     public PatchTransfersListener(NatsService natsService,
@@ -85,7 +88,8 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                                   ObjectMapper objectMapper,
                                   AuditPublisherService auditPublisher,
                                   BackendErrorSerializer backendErrorSerializer,
-                                  ConnectorToTazamaPublisher connectorToTazamaPublisher) {
+                                  ConnectorToTazamaPublisher connectorToTazamaPublisher,
+                                  TazamaPayloadBuilder tazamaPayloadBuilder) {
 
         this.natsService = natsService;
         this.pendingStore = pendingStore;
@@ -95,6 +99,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
         this.auditPublisher = auditPublisher;
         this.backendErrorSerializer = backendErrorSerializer;
         this.connectorToTazamaPublisher = connectorToTazamaPublisher;
+        this.tazamaPayloadBuilder = tazamaPayloadBuilder;
     }
 
     @Override
@@ -157,10 +162,6 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
             }
             StateEnum confirmationState = confirmationState(transferState);
 
-            connectorToTazamaPublisher.publishTransferRequest(
-                transferId,
-                transferRequestPayload(msg, pending));
-
             String confirmedHomeTransactionId = confirmTransfer(transferId,
                                                                 pending.payer(),
                                                                 pending.payee(),
@@ -175,7 +176,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
             connectorToTazamaPublisher.publishTransferResponse(
                 transferId,
-                transferResponsePayload(msg, confirmedHomeTransactionId));
+                tazamaPayloadBuilder.transferResponsePayload(msg, confirmedHomeTransactionId));
 
             publishPatchSuccessAudit(msg, pending, confirmedHomeTransactionId);
 
@@ -325,40 +326,6 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
                     publishErr);
         }
     }
-
-    private Map<String, Object> transferRequestPayload(PatchTransfersNatsMessage msg, PendingTransfer pending) {
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("transferId", msg.getTransferId());
-        payload.put("payerFsp", msg.getPayerFsp());
-        payload.put("payeeFsp", msg.getPayeeFsp());
-        payload.put("payer", pending.payer());
-        payload.put("payee", pending.payee());
-        payload.put("amount", pending.amount());
-        payload.put("payeeReceiveAmount", pending.payeeReceiveAmount());
-        payload.put("currency", pending.currency());
-        payload.put("homeTransactionId", pending.homeTransactionId());
-        payload.put("subScenario", pending.subScenario());
-        payload.put("note", pending.note());
-        payload.put("extensionList", pending.extensionList());
-        return payload;
-    }
-
-    private Map<String, Object> transferResponsePayload(PatchTransfersNatsMessage msg,
-                                                        String homeTransactionId) {
-
-        TransfersIDPatchResponse patchResponse = msg.getResponse();
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("transferId", msg.getTransferId());
-        payload.put("payerFsp", msg.getPayerFsp());
-        payload.put("payeeFsp", msg.getPayeeFsp());
-        payload.put("completedTimestamp", patchResponse.getCompletedTimestamp());
-        payload.put("homeTransactionId", homeTransactionId);
-        payload.put("transferState", patchResponse.getTransferState());
-        payload.put("extensionList", patchResponse.getExtensionList());
-        return payload;
-    }
-
 
     private ConfirmationForTransfer.QuoteRequest quoteRequest(Party payer,
                                                               Party payee,

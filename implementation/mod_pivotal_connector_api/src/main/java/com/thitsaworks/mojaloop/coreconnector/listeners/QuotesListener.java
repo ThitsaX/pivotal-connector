@@ -32,6 +32,7 @@ import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostQuotesNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.services.FspClientService;
 import com.thitsaworks.mojaloop.coreconnector.tazama.ConnectorToTazamaPublisher;
+import com.thitsaworks.mojaloop.coreconnector.tazama.payload.TazamaPayloadBuilder;
 import io.nats.client.JetStreamManagement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +61,8 @@ public class QuotesListener implements InitializingBean, DisposableBean {
 
     private final ConnectorToTazamaPublisher connectorToTazamaPublisher;
 
+    private final TazamaPayloadBuilder tazamaPayloadBuilder;
+
     private NatsPullListener<PostQuotesNatsMessage> listener;
 
     public QuotesListener(NatsService natsService,
@@ -69,7 +72,8 @@ public class QuotesListener implements InitializingBean, DisposableBean {
                           CoreConnectorConfiguration.Settings config,
                           PostQuoteMapper quotesResponseMapper,
                           ObjectMapper objectMapper,
-                          ConnectorToTazamaPublisher connectorToTazamaPublisher) {
+                          ConnectorToTazamaPublisher connectorToTazamaPublisher,
+                          TazamaPayloadBuilder tazamaPayloadBuilder) {
 
         this.natsService = natsService;
         this.callback = callback;
@@ -79,6 +83,7 @@ public class QuotesListener implements InitializingBean, DisposableBean {
         this.quotesResponseMapper = quotesResponseMapper;
         this.objectMapper = objectMapper;
         this.connectorToTazamaPublisher = connectorToTazamaPublisher;
+        this.tazamaPayloadBuilder = tazamaPayloadBuilder;
     }
 
     @Override
@@ -153,7 +158,9 @@ public class QuotesListener implements InitializingBean, DisposableBean {
                 throw new PostQuoteException(errorInformation.getStatusCode(), errorInformation.getMessage());
             }
 
-            connectorToTazamaPublisher.publishQuoteResponse(responseFromFsp.getQuoteId(), responseFromFsp);
+            connectorToTazamaPublisher.publishQuoteResponse(
+                responseFromFsp.getQuoteId(),
+                tazamaPayloadBuilder.buildQuoteResponsePayload(quoteRequestToFsp, responseFromFsp));
 
             LOG.info("Quote response from Payee for TransferId {} : {}",
                      request.getTransactionId(),

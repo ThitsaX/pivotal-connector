@@ -36,6 +36,8 @@ import com.thitsaworks.mojaloop.coreconnector.nats.NatsService;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostTransfersNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.services.FspClientService;
+import com.thitsaworks.mojaloop.coreconnector.tazama.ConnectorToTazamaPublisher;
+import com.thitsaworks.mojaloop.coreconnector.tazama.payload.TazamaPayloadBuilder;
 import io.nats.client.JetStreamManagement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +68,10 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
     private final PostTransferMapper transferMapper;
 
+    private final ConnectorToTazamaPublisher connectorToTazamaPublisher;
+
+    private final TazamaPayloadBuilder tazamaPayloadBuilder;
+
     public TransfersListener(NatsService natsService,
                              FspiopCallbackService callback,
                              IlpService ilp,
@@ -73,7 +79,9 @@ public class TransfersListener implements InitializingBean, DisposableBean {
                              FspClientService fspClientService,
                              CoreConnectorConfiguration.Settings config,
                              ObjectMapper objectMapper,
-                             PostTransferMapper transferMapper) {
+                             PostTransferMapper transferMapper,
+                             ConnectorToTazamaPublisher connectorToTazamaPublisher,
+                             TazamaPayloadBuilder tazamaPayloadBuilder) {
 
         this.natsService = natsService;
         this.callback = callback;
@@ -83,6 +91,8 @@ public class TransfersListener implements InitializingBean, DisposableBean {
         this.config = config;
         this.objectMapper = objectMapper;
         this.transferMapper = transferMapper;
+        this.connectorToTazamaPublisher = connectorToTazamaPublisher;
+        this.tazamaPayloadBuilder = tazamaPayloadBuilder;
     }
 
     @Override
@@ -205,6 +215,10 @@ public class TransfersListener implements InitializingBean, DisposableBean {
             if (!fulfilResult.valid()) {
                 throw new IllegalStateException("ILP condition mismatch for transferId=" + transferId);
             }
+
+            connectorToTazamaPublisher.publishTransferRequest(
+                transferId,
+                tazamaPayloadBuilder.transferRequestPayload(request, agreement));
 
             String homeTransactionId = reserveTransfer(agreement, request);
 
