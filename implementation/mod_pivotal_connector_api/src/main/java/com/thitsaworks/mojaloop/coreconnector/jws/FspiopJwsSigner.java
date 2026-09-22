@@ -26,6 +26,7 @@ import okhttp3.Interceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.InitializingBean;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,7 +55,7 @@ public class FspiopJwsSigner implements InitializingBean {
 
     private Interceptor interceptor;
 
-    public FspiopJwsSigner(CoreConnectorConfiguration.Settings config, Vault vault) {
+    public FspiopJwsSigner(CoreConnectorConfiguration.Settings config, @Nullable Vault vault) {
 
         this.config = config;
         this.vault = vault;
@@ -70,7 +71,7 @@ public class FspiopJwsSigner implements InitializingBean {
             return;
         }
 
-        if (!this.vault.isConfigured()) {
+        if (this.vault == null || !this.vault.isConfigured()) {
             // Enabling signing without somewhere to get a key is a misconfiguration, not a state to
             // degrade through: it would send unsigned traffic while the operator believed otherwise.
             throw new IllegalStateException(
