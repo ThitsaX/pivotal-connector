@@ -17,27 +17,27 @@
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
 import com.thitsaworks.mojaloop.coreconnector.audit.AuditPublisherService;
-import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
-import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DisputedStatus;
 import com.thitsaworks.mojaloop.coreconnector.services.FspClientService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Component
-public class DisputeStatusManager implements InitializingBean, DisposableBean {
+@ConditionalOnProperty(
+    name = "pivotalDisputeStatusEnabled",
+    havingValue = "true"
+)
+public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusManager.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusChecker.class);
 
     private static final long STATUS_CHECK_INITIAL_DELAY_MINUTES = 1L;
 
@@ -45,13 +45,11 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
 
     private static final long STATUS_RETRY_DELAY_SECONDS = 10L;
 
+    private final DisputeStatusStore disputeStatusStore;
+
     private final FspClientService fspClientService;
 
     private final AuditPublisherService auditPublisherService;
-
-    private final Map<String, DisputedTransfer> disputedTransfers = new ConcurrentHashMap<>();
-
-    private final Map<String, DisputedStatus.Response> disputeResults = new ConcurrentHashMap<>();
 
     private final ScheduledExecutorService checker = Executors.newSingleThreadScheduledExecutor(
         r -> {
@@ -61,9 +59,11 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         });
 
     @Autowired
-    public DisputeStatusManager(FspClientService fspClientService,
+    public DisputeStatusChecker(DisputeStatusStore disputeStatusStore,
+                                FspClientService fspClientService,
                                 AuditPublisherService auditPublisherService) {
 
+        this.disputeStatusStore = disputeStatusStore;
         this.fspClientService = fspClientService;
         this.auditPublisherService = auditPublisherService;
     }
@@ -91,39 +91,13 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         this.checker.shutdownNow();
     }
 
-    public void markDispute(String transferId, ExtensionList extensionList) {
-
-        if (!StringUtils.hasLength(transferId)) {
-            LOG.info("Ignoring dispute mark because transferId is blank.");
-            return;
-        }
-
-        LOG.info(
-            "Mark dispute requested for transferId {} with extensionList={}. Current pendingCount={}.",
-            transferId, extensionList, this.disputedTransfers.size());
-
-        DisputedTransfer existing = this.disputedTransfers.putIfAbsent(
-            transferId,
-            new DisputedTransfer(transferId, extensionList, System.currentTimeMillis()));
-
-        if (existing == null) {
-            LOG.info(
-                "Marked transferId {} as dispute. It will be checked every {} minute(s).",
-                transferId, STATUS_CHECK_PERIOD_MINUTES);
-        } else {
-            LOG.info(
-                "Dispute already marked for transferId {}. Existing age={} ms. PendingCount={}.",
-                transferId, this.ageMillis(existing), this.disputedTransfers.size());
-        }
-    }
-
     private void checkDisputedTransfers() {
 
         LOG.info(
             "Running dispute status check. PendingCount={}, resultCount={}.",
-            this.disputedTransfers.size(), this.disputeResults.size());
+            this.disputeStatusStore.getPendingCount(), this.disputeStatusStore.getResultCount());
 
-        this.disputedTransfers.values().forEach(disputedTransfer -> {
+        this.disputeStatusStore.getPendingTransfers().forEach(disputedTransfer -> {
 
             LOG.info(
                 "Evaluating disputed transferId {}. age={} ms, readyForCheck={}.",
@@ -143,7 +117,8 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         });
     }
 
-    private void checkDisputedTransfer(DisputedTransfer disputedTransfer) throws Exception {
+    private void checkDisputedTransfer(DisputeStatusStore.DisputedTransaction disputedTransfer)
+        throws Exception {
 
         LOG.info(
             "Checking disputed transferId {} with extensionList={}.",
@@ -160,17 +135,16 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
             transactionStatus = this.retryDisputeStatus(disputedTransfer);
         }
 
-        this.disputedTransfers.remove(disputedTransfer.transferId());
+        this.disputeStatusStore.removePendingTransfer(disputedTransfer.transferId());
 
         boolean dispute = !TransactionStatus.SUCCESS.equals(transactionStatus);
 
         LOG.info(
             "Dispute check finished for transferId {}. finalTransactionStatus={}, dispute={}, pendingCountBeforeStore={}, resultCountBeforeStore={}.",
             disputedTransfer.transferId(), transactionStatus, dispute,
-            this.disputedTransfers.size(), this.disputeResults.size());
+            this.disputeStatusStore.getPendingCount(), this.disputeStatusStore.getResultCount());
 
-        this.disputeResults.put(
-            disputedTransfer.transferId(), new DisputedStatus.Response(dispute));
+        this.disputeStatusStore.saveResult(disputedTransfer.transferId(), dispute);
 
         if (dispute) {
 
@@ -187,7 +161,7 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
             new AuditPublisherService.DisputeResultInput(disputedTransfer.transferId(), dispute));
     }
 
-    private TransactionStatus resolveDispute(DisputedTransfer disputedTransfer) {
+    private TransactionStatus resolveDispute(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
         try {
 
@@ -197,6 +171,14 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
 
             TransactionStatus transactionStatus = this.fspClientService.getTransactionStatus(
                 disputedTransfer.transferId(), disputedTransfer.extensionList());
+
+            if (transactionStatus == null) {
+                LOG.info(
+                    "Get Transaction Status returned null for transferId {}. Dispute remains true.",
+                    disputedTransfer.transferId());
+
+                return TransactionStatus.FAILED;
+            }
 
             LOG.info(
                 "Get Transaction Status returned {} for transferId {}.",
@@ -214,7 +196,7 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         }
     }
 
-    private boolean isReadyForStatusCheck(DisputedTransfer disputedTransfer) {
+    private boolean isReadyForStatusCheck(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
         return System.currentTimeMillis() - disputedTransfer.markedAt() >=
                    TimeUnit.MINUTES.toMillis(1);
@@ -225,7 +207,7 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         return TransactionStatus.PENDING.equals(status);
     }
 
-    private TransactionStatus retryDisputeStatus(DisputedTransfer disputedTransfer) {
+    private TransactionStatus retryDisputeStatus(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
         try {
 
@@ -249,13 +231,9 @@ public class DisputeStatusManager implements InitializingBean, DisposableBean {
         return this.resolveDispute(disputedTransfer);
     }
 
-    private long ageMillis(DisputedTransfer disputedTransfer) {
+    private long ageMillis(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
         return System.currentTimeMillis() - disputedTransfer.markedAt();
     }
-
-    private record DisputedTransfer(String transferId,
-                                    ExtensionList extensionList,
-                                    long markedAt) { }
 
 }
