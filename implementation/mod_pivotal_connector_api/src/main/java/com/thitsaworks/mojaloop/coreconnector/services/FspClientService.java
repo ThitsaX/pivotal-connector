@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.services;
 
+import com.thitsaworks.mojaloop.coreconnector.dispute.TransactionStatus;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForTransfer;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.LookUp;
@@ -31,5 +34,7 @@ public interface FspClientService {
     ReservationForTransfer.Response doReservationForTransfer(ReservationForTransfer.Request request);
 
     ConfirmationForTransfer.Response doConfirmationForTransfer(ConfirmationForTransfer.Request request);
+
+    TransactionStatus getTransactionStatus(String transferId, ExtensionList extensionList);
 
 }

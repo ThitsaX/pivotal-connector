@@ -110,7 +110,28 @@ public class AuditPublisherService {
                 input.correlationId, input.payeeMobile(), input.amount(), input.homeTransactionId());
     }
 
-    private synchronized void ensureStream() throws Exception {
+
+    public void publishAudit(DisputeResultInput input) throws Exception {
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("transferId", input.transferId());
+        content.put("dispute", input.dispute());
+
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("phase", PATCH_PHASE);
+        message.put("action",SUCCESS_ACTION );
+        message.put("gateway", CONNECTOR_GATEWAY);
+        message.put("content", content);
+
+        this.natsService.jetstream().publish(SUBJECT, this.natsService.serialize(message));
+
+        LOG.info(
+            "Published Dispute SUCCESS audit transferId={} dispute={}",
+            input.transferId, input.dispute());
+
+
+    }
+        private synchronized void ensureStream() throws Exception {
 
         if (streamResolved) {
             return;
@@ -158,5 +179,8 @@ public class AuditPublisherService {
                                     String payeeMobile,
                                     String amount,
                                     String homeTransactionId) { }
+
+    public record DisputeResultInput(String transferId,
+                                     Boolean dispute) { }
 
 }
