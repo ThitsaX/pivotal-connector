@@ -25,8 +25,12 @@ import org.springframework.boot.web.server.ConfigurableWebServerFactory;
 import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.Condition;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.core.type.AnnotatedTypeMetadata;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -38,7 +42,7 @@ import java.util.Locale;
 @Import(
     {
         ComponentConfiguration.class,
-        VaultConfiguration.class})
+        CoreConnectorConfiguration.JwsVaultConfiguration.class})
 public class CoreConnectorConfiguration {
 
     @Bean
@@ -64,13 +68,35 @@ public class CoreConnectorConfiguration {
                    .build();
     }
 
-    @Bean
-    public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+    @Configuration
+    @Conditional(FspiopJwsEnabledCondition.class)
+    @Import(VaultConfiguration.class)
+    public static class JwsVaultConfiguration {
+
+        @Bean
+        public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+
+            return createVaultSettings(connectorSettings);
+        }
+
+    }
+
+    private static VaultConfiguration.Settings createVaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
 
         return new VaultConfiguration.Settings(
             connectorSettings.getVaultUrl(), connectorSettings.getVaultRole(),
             connectorSettings.getVaultKubernetesAuthPath(), connectorSettings.getVaultKvMount(),
             connectorSettings.getVaultServiceAccountTokenPath());
+    }
+
+    static final class FspiopJwsEnabledCondition implements Condition {
+
+        @Override
+        public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+
+            return Settings.propBoolean("fspiopUseJws", false);
+        }
+
     }
 
     @Getter
