@@ -16,7 +16,7 @@
 
 package com.thitsaworks.mojaloop.coreconnector.payload.fspclient;
 
-public class DisputedStatus {
+public class DisputeResult {
 
     public record Request(String transferId) { }
 

@@ -72,12 +72,12 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
     public void afterPropertiesSet() {
 
         LOG.info(
-            "Starting dispute status checker with initialDelay={} minute(s), period={} minute(s), retryDelay={} second(s).",
+            "Starting dispute status checker with initial delay={} minute(s), check period={} minute(s), retry delay={} second(s).",
             STATUS_CHECK_INITIAL_DELAY_MINUTES, STATUS_CHECK_PERIOD_MINUTES,
             STATUS_RETRY_DELAY_SECONDS);
 
         this.checker.scheduleAtFixedRate(
-            this::checkDisputedTransfers,
+            this::checkDisputedTransaction,
             STATUS_CHECK_INITIAL_DELAY_MINUTES,
             STATUS_CHECK_PERIOD_MINUTES,
             TimeUnit.MINUTES);
@@ -91,24 +91,25 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         this.checker.shutdownNow();
     }
 
-    private void checkDisputedTransfers() {
+    private void checkDisputedTransaction() {
 
         LOG.info(
-            "Running dispute status check. PendingCount={}, resultCount={}.",
-            this.disputeStatusStore.getPendingCount(), this.disputeStatusStore.getResultCount());
+            "Running dispute status check with disputed transaction count={}, dispute result count={}.",
+            this.disputeStatusStore.getPendingDisputedTransactionCount(),
+            this.disputeStatusStore.getDisputeResultCount());
 
-        this.disputeStatusStore.getPendingTransfers().forEach(disputedTransfer -> {
+        this.disputeStatusStore.getPendingDisputedTransactions().forEach(disputedTransaction -> {
 
             LOG.info(
-                "Evaluating disputed transferId {}. age={} ms, readyForCheck={}.",
-                disputedTransfer.transferId(), this.ageMillis(disputedTransfer),
-                this.isReadyForStatusCheck(disputedTransfer));
+                "Evaluating disputed transferId {}. disputeDuration={} ms, readyForStatusCheck={}.",
+                disputedTransaction.transferId(), this.getDisputeDurationMillis(disputedTransaction),
+                this.isReadyForStatusCheck(disputedTransaction));
 
-            if (this.isReadyForStatusCheck(disputedTransfer)) {
+            if (this.isReadyForStatusCheck(disputedTransaction)) {
 
                 try {
 
-                    this.checkDisputedTransfer(disputedTransfer);
+                    this.checkDisputedTransaction(disputedTransaction);
 
                 } catch (Exception e) {
                     throw new RuntimeException(e);
@@ -117,51 +118,51 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         });
     }
 
-    private void checkDisputedTransfer(DisputeStatusStore.DisputedTransaction disputedTransfer)
+    private void checkDisputedTransaction(DisputeStatusStore.DisputedTransaction disputedTransaction)
         throws Exception {
 
         LOG.info(
-            "Checking disputed transferId {} with extensionList={}.",
-            disputedTransfer.transferId(), disputedTransfer.extensionList());
+            "Checking disputed transaction for transferId {} with extensionList={}.",
+            disputedTransaction.transferId(), disputedTransaction.extensionList());
 
-        TransactionStatus transactionStatus = this.resolveDispute(disputedTransfer);
+        TransactionStatus transactionStatus = this.resolveDisputeStatus(disputedTransaction);
 
         if (this.isRetryableStatus(transactionStatus)) {
 
             LOG.info(
                 "Transaction status is {} for transferId {}. Retrying after {} second(s).",
-                transactionStatus, disputedTransfer.transferId(), STATUS_RETRY_DELAY_SECONDS);
+                transactionStatus, disputedTransaction.transferId(), STATUS_RETRY_DELAY_SECONDS);
 
-            transactionStatus = this.retryDisputeStatus(disputedTransfer);
+            transactionStatus = this.retryDisputeStatus(disputedTransaction);
         }
 
-        this.disputeStatusStore.removePendingTransfer(disputedTransfer.transferId());
+        this.disputeStatusStore.removeDisputedTransaction(disputedTransaction.transferId());
 
         boolean dispute = !TransactionStatus.SUCCESS.equals(transactionStatus);
 
         LOG.info(
-            "Dispute check finished for transferId {}. finalTransactionStatus={}, dispute={}, pendingCountBeforeStore={}, resultCountBeforeStore={}.",
-            disputedTransfer.transferId(), transactionStatus, dispute,
-            this.disputeStatusStore.getPendingCount(), this.disputeStatusStore.getResultCount());
+            "Dispute check finished for transferId {}. finalTransactionStatus={}, dispute={}, resultCountBeforeStore={}.",
+            disputedTransaction.transferId(), transactionStatus, dispute,
+            this.disputeStatusStore.getDisputeResultCount());
 
-        this.disputeStatusStore.saveResult(disputedTransfer.transferId(), dispute);
+        this.disputeStatusStore.saveDisputeResult(disputedTransaction.transferId(), dispute);
 
         if (dispute) {
 
             LOG.info(
                 "Confirmed dispute for transferId {} because transaction status is not successful.",
-                disputedTransfer.transferId());
+                disputedTransaction.transferId());
         } else {
             LOG.info(
                 "Resolved dispute for transferId {} because transaction status is successful.",
-                disputedTransfer.transferId());
+                disputedTransaction.transferId());
         }
 
         this.auditPublisherService.publishAudit(
-            new AuditPublisherService.DisputeResultInput(disputedTransfer.transferId(), dispute));
+            new AuditPublisherService.DisputeResultInput(disputedTransaction.transferId(), dispute));
     }
 
-    private TransactionStatus resolveDispute(DisputeStatusStore.DisputedTransaction disputedTransfer) {
+    private TransactionStatus resolveDisputeStatus(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
         try {
 
@@ -198,7 +199,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private boolean isReadyForStatusCheck(DisputeStatusStore.DisputedTransaction disputedTransfer) {
 
-        return System.currentTimeMillis() - disputedTransfer.markedAt() >=
+        return System.currentTimeMillis() - disputedTransfer.disputedAt() >=
                    TimeUnit.MINUTES.toMillis(1);
     }
 
@@ -228,12 +229,16 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
             return TransactionStatus.FAILED;
         }
 
-        return this.resolveDispute(disputedTransfer);
+        return this.resolveDisputeStatus(disputedTransfer);
     }
 
-    private long ageMillis(DisputeStatusStore.DisputedTransaction disputedTransfer) {
+    private long getDisputeDurationMillis(DisputeStatusStore.DisputedTransaction disputedTransaction) {
 
-        return System.currentTimeMillis() - disputedTransfer.markedAt();
+        LOG.info(
+            "Getting dispute duration for transferId {}, disputed at {}.",
+            disputedTransaction.transferId(), disputedTransaction.disputedAt());
+
+        return System.currentTimeMillis() - disputedTransaction.disputedAt();
     }
 
 }

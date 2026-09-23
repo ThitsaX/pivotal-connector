@@ -17,7 +17,7 @@
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
-import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DisputedStatus;
+import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DisputeResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -34,68 +34,71 @@ public class DisputeStatusStore {
 
     private static final long STATUS_CHECK_PERIOD_MINUTES = 1L;
 
-    private final Map<String, DisputedTransaction> disputedTransaction = new ConcurrentHashMap<>();
+    private final Map<String, DisputedTransaction> disputedTransactions = new ConcurrentHashMap<>();
 
-    private final Map<String, DisputedStatus.Response> disputeResults = new ConcurrentHashMap<>();
+    private final Map<String, DisputeResult.Response> disputeResults = new ConcurrentHashMap<>();
 
-    public void storeDisputedTransfer(String transferId, ExtensionList extensionList) {
+    public void storeDisputedTransaction(String transferId, ExtensionList extensionList) {
 
         if (!StringUtils.hasLength(transferId)) {
-            LOG.info("Ignoring dispute mark because transferId is blank.");
+            LOG.info("Ignoring dispute store request because transferId is blank.");
             return;
         }
 
-        LOG.info(
-            "Mark dispute requested for transferId {} with extensionList={}. Current pendingCount={}.",
-            transferId, extensionList, this.disputedTransaction.size());
-
-        DisputedTransaction existing = this.disputedTransaction.putIfAbsent(
+        DisputedTransaction disputedTransaction = new DisputedTransaction(
             transferId,
-            new DisputedTransaction(transferId, extensionList, System.currentTimeMillis()));
+            extensionList,
+            System.currentTimeMillis());
 
-        if (existing == null) {
+        DisputedTransaction existingDisputedTransaction = this.disputedTransactions.putIfAbsent(
+            transferId,
+            disputedTransaction);
+
+        LOG.info(
+            "Dispute store requested for transferId {} with extensionList={}. Current disputed transaction count={}.",
+            transferId, extensionList, this.disputedTransactions.size());
+
+        if (existingDisputedTransaction == null) {
+
             LOG.info(
-                "Marked transferId {} as dispute. It will be checked every {} minute(s).",
-                transferId, STATUS_CHECK_PERIOD_MINUTES);
+                "Stored transferId {} as a disputed transaction at {}. It will be checked every {} minute(s).",
+                transferId, disputedTransaction.disputedAt(), STATUS_CHECK_PERIOD_MINUTES);
+
         } else {
+
             LOG.info(
-                "Dispute already marked for transferId {}. Existing age={} ms. PendingCount={}.",
-                transferId, this.ageMillis(existing), this.disputedTransaction.size());
+                "Dispute already exists for transferId {}. It was first stored at {}. Current disputed transaction count={}.",
+                transferId, existingDisputedTransaction.disputedAt(), this.disputedTransactions.size());
         }
     }
 
-    public Collection<DisputedTransaction> getPendingTransfers() {
+    public Collection<DisputedTransaction> getPendingDisputedTransactions() {
 
-        return this.disputedTransaction.values();
+        return this.disputedTransactions.values();
     }
 
-    public void removePendingTransfer(String transferId) {
+    public void removeDisputedTransaction(String transferId) {
 
-        this.disputedTransaction.remove(transferId);
+        this.disputedTransactions.remove(transferId);
     }
 
-    public void saveResult(String transferId, boolean dispute) {
+    public void saveDisputeResult(String transferId, boolean dispute) {
 
-        this.disputeResults.put(transferId, new DisputedStatus.Response(dispute));
+        this.disputeResults.put(transferId, new DisputeResult.Response(dispute));
     }
 
-    public int getPendingCount() {
+    public int getPendingDisputedTransactionCount() {
 
-        return this.disputedTransaction.size();
+        return this.disputedTransactions.size();
     }
 
-    public int getResultCount() {
+    public int getDisputeResultCount() {
 
         return this.disputeResults.size();
     }
 
-    private long ageMillis(DisputedTransaction disputedTransfer) {
-
-        return System.currentTimeMillis() - disputedTransfer.markedAt();
-    }
-
     public record DisputedTransaction(String transferId,
                                       ExtensionList extensionList,
-                                      long markedAt) { }
+                                      long disputedAt) { }
 
 }
