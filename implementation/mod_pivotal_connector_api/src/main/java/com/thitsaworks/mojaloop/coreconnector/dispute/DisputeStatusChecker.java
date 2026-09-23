@@ -158,7 +158,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
                 disputedTransaction.transferId());
         }
 
-        this.auditPublisherService.publishAudit(
+        this.auditPublisherService.publishDisputeStatus(
             new AuditPublisherService.DisputeResultInput(disputedTransaction.transferId(), dispute));
     }
 

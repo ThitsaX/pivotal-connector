@@ -111,7 +111,7 @@ public class AuditPublisherService {
     }
 
 
-    public void publishAudit(DisputeResultInput input) throws Exception {
+    public void publishDisputeStatus(DisputeResultInput input) throws Exception {
 
         Map<String, Object> content = new LinkedHashMap<>();
         content.put("transferId", input.transferId());
@@ -128,8 +128,7 @@ public class AuditPublisherService {
         LOG.info(
             "Published Dispute SUCCESS audit transferId={} dispute={}",
             input.transferId, input.dispute());
-
-
+        
     }
         private synchronized void ensureStream() throws Exception {
 
