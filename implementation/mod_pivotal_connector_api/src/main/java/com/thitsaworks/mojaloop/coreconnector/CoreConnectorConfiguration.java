@@ -171,12 +171,10 @@ public class CoreConnectorConfiguration {
         // ── Key custody ──────────────────────────────────────────────────────
         // Where the signing key lives, and therefore where signing happens. `vault-kv` reads a PEM
         // into memory; `pkcs11` signs inside a device and this process never holds key material.
+        // The device's own address is not configured here -- the vendor SDK carries it in its
+        // configuration file, written when the image starts.
 
         private final String keyProvider;
-
-        private final String pkcs11ModulePath;
-
-        private final int pkcs11SlotListIndex;
 
         private final String hsmCredPath;
 
@@ -241,8 +239,6 @@ public class CoreConnectorConfiguration {
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
 
             this.keyProvider = prop("keyProvider", "vault-kv");
-            this.pkcs11ModulePath = prop("pkcs11ModulePath", "");
-            this.pkcs11SlotListIndex = (int) propLong("pkcs11SlotListIndex", 0L);
             this.hsmCredPath = prop("hsmCredPath", "");
             this.keyRefPathPrefix = prop("keyRefPathPrefix", "pivotal/keyref");
 

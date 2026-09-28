@@ -19,7 +19,7 @@ package com.thitsaworks.mojaloop.coreconnector.jws;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.FspiopSigningInterceptor;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.Pkcs11JwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.CloudHsmJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.StaticJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.VaultJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.vault.Vault;
@@ -110,12 +110,6 @@ public class FspiopJwsSigner implements InitializingBean {
 
         if (PKCS11.equals(provider)) {
 
-            if (this.config.getPkcs11ModulePath() == null || this.config.getPkcs11ModulePath().isBlank()) {
-                throw new IllegalStateException(
-                    "keyProvider is 'pkcs11' but pkcs11ModulePath is not set. Without the device "
-                    + "library there is nothing to sign through.");
-            }
-
             if (this.config.getHsmCredPath() == null || this.config.getHsmCredPath().isBlank()) {
                 // This connector signs, so it needs its own crypto user. An absent path would
                 // leave it unable to log in and every callback unsigned.
@@ -124,10 +118,12 @@ public class FspiopJwsSigner implements InitializingBean {
                     + "holding this tenant's crypto-user credential.");
             }
 
-            return new Pkcs11JwsKeyProvider(
+            // The setting names the custody model, not the interface. The services written in
+            // TypeScript do reach the device through PKCS#11; this one cannot, because the JDK's
+            // PKCS#11 keystore needs a certificate the device will not store -- so it uses the
+            // vendor's own provider. Same profile, same key, different API.
+            return new CloudHsmJwsKeyProvider(
                 this.vault, this.config.getConnectorId(),
-                this.config.getPkcs11ModulePath(),
-                this.config.getPkcs11SlotListIndex(),
                 this.config.getHsmCredPath(),
                 this.config.getKeyRefPathPrefix());
         }
