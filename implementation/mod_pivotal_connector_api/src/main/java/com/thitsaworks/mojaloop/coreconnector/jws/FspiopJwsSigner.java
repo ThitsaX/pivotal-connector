@@ -19,6 +19,7 @@ package com.thitsaworks.mojaloop.coreconnector.jws;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.FspiopSigningInterceptor;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.Pkcs11JwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.StaticJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.VaultJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.vault.Vault;
@@ -46,6 +47,10 @@ import org.springframework.stereotype.Component;
 public class FspiopJwsSigner implements InitializingBean {
 
     private static final Logger LOG = LoggerFactory.getLogger(FspiopJwsSigner.class);
+
+    private static final String VAULT_KV = "vault-kv";
+
+    private static final String PKCS11 = "pkcs11";
 
     private final CoreConnectorConfiguration.Settings config;
 
@@ -78,13 +83,58 @@ public class FspiopJwsSigner implements InitializingBean {
                 "fspiopUseJws is enabled but Vault is not configured. Set vaultUrl and vaultRole.");
         }
 
-        this.keyProvider = new VaultJwsKeyProvider(
-            this.vault, this.config.getConnectorId(),
-            this.config.getVaultJwsKeyPathPrefix());
-
+        this.keyProvider = createKeyProvider();
         this.keyProvider.refresh();
 
         this.interceptor = new FspiopSigningInterceptor(this.keyProvider, true);
+    }
+
+    /**
+     * Chooses where this connector's key lives, and therefore where signing happens.
+     * <p>
+     * An unrecognised value throws rather than defaulting. Falling back would decide key custody on
+     * the basis of a typo, and the wrong answer is not a degraded mode — it is a private key in
+     * process memory in a deployment that chose hardware to prevent exactly that.
+     */
+    private JwsKeyProvider createKeyProvider() {
+
+        String provider = this.config.getKeyProvider() == null
+            ? VAULT_KV
+            : this.config.getKeyProvider().trim().toLowerCase(java.util.Locale.ROOT);
+
+        if (VAULT_KV.equals(provider)) {
+            return new VaultJwsKeyProvider(
+                this.vault, this.config.getConnectorId(),
+                this.config.getVaultJwsKeyPathPrefix());
+        }
+
+        if (PKCS11.equals(provider)) {
+
+            if (this.config.getPkcs11ModulePath() == null || this.config.getPkcs11ModulePath().isBlank()) {
+                throw new IllegalStateException(
+                    "keyProvider is 'pkcs11' but pkcs11ModulePath is not set. Without the device "
+                    + "library there is nothing to sign through.");
+            }
+
+            if (this.config.getHsmCredPath() == null || this.config.getHsmCredPath().isBlank()) {
+                // This connector signs, so it needs its own crypto user. An absent path would
+                // leave it unable to log in and every callback unsigned.
+                throw new IllegalStateException(
+                    "keyProvider is 'pkcs11' but hsmCredPath is not set. Set it to the Vault path "
+                    + "holding this tenant's crypto-user credential.");
+            }
+
+            return new Pkcs11JwsKeyProvider(
+                this.vault, this.config.getConnectorId(),
+                this.config.getPkcs11ModulePath(),
+                this.config.getPkcs11SlotListIndex(),
+                this.config.getHsmCredPath(),
+                this.config.getKeyRefPathPrefix());
+        }
+
+        throw new IllegalStateException(
+            "Unrecognised keyProvider '" + this.config.getKeyProvider() + "'. Expected '"
+            + VAULT_KV + "' or '" + PKCS11 + "'.");
     }
 
     /** Install on any OkHttp client that carries outbound FSPIOP traffic. */

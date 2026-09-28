@@ -168,6 +168,20 @@ public class CoreConnectorConfiguration {
 
         private final String vaultServiceAccountTokenPath;
 
+        // ── Key custody ──────────────────────────────────────────────────────
+        // Where the signing key lives, and therefore where signing happens. `vault-kv` reads a PEM
+        // into memory; `pkcs11` signs inside a device and this process never holds key material.
+
+        private final String keyProvider;
+
+        private final String pkcs11ModulePath;
+
+        private final int pkcs11SlotListIndex;
+
+        private final String hsmCredPath;
+
+        private final String keyRefPathPrefix;
+
         // ── FSPIOP mutual TLS (hub-facing leg) ───────────────────────────────
         // Unlike JWS this cannot be switched on unilaterally: the peer must be listening for TLS
         // and must already trust the CA that signed this connector's certificate, so enabling it
@@ -225,6 +239,12 @@ public class CoreConnectorConfiguration {
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
+
+            this.keyProvider = prop("keyProvider", "vault-kv");
+            this.pkcs11ModulePath = prop("pkcs11ModulePath", "");
+            this.pkcs11SlotListIndex = (int) propLong("pkcs11SlotListIndex", 0L);
+            this.hsmCredPath = prop("hsmCredPath", "");
+            this.keyRefPathPrefix = prop("keyRefPathPrefix", "pivotal/keyref");
 
             this.fspiopUseMutualTls = propBoolean("fspiopUseMutualTls", false);
             this.fspiopMtlsCaPath = prop("fspiopMtlsCaPath", "");
