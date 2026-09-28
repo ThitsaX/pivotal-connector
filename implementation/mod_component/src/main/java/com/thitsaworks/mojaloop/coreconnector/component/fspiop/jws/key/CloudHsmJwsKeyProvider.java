@@ -217,15 +217,31 @@ public class CloudHsmJwsKeyProvider implements JwsKeyProvider {
         Class<?> type;
 
         try {
-            type = Class.forName(PROVIDER_CLASS);
+            // Resolved without initialising, so that a jar which is present but unusable is
+            // reported as what it is. Initialising loads the SDK's native library, and a missing
+            // one would otherwise surface here as though the class itself were absent -- sending
+            // whoever reads it to look for the wrong thing.
+            type = Class.forName(PROVIDER_CLASS, false, getClass().getClassLoader());
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException(
-                "The CloudHSM JCE provider is not on the classpath. It ships with the device SDK "
-                + "and must be installed in the image, and its configuration must name the "
-                + "cluster address.", e);
+                "The CloudHSM JCE provider is not on the classpath. It ships with the device SDK, "
+                + "must be installed in the image, and -- because it lives outside the application "
+                + "archive -- must be named on the classpath at launch.", e);
         }
 
-        Provider configured = (Provider) type.getDeclaredConstructor().newInstance();
+        Provider configured;
+
+        try {
+            configured = (Provider) type.getDeclaredConstructor().newInstance();
+        } catch (ExceptionInInitializerError | NoClassDefFoundError e) {
+            // The class is there and cannot start. Almost always the SDK's native library is
+            // missing, or its configuration still carries the placeholder address it ships with.
+            throw new IllegalStateException(
+                "The CloudHSM JCE provider is on the classpath but failed to initialise. Check "
+                + "that the full device SDK is installed, not only its jar, and that its "
+                + "configuration names the cluster address.", e);
+        }
+
         Security.addProvider(configured);
 
         return configured;
