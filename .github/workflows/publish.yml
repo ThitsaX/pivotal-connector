@@ -10,7 +10,13 @@ permissions:
   packages: write
 
 jobs:
+  gitleaks:
+    uses: ./.github/workflows/gitleaks.yml
+    permissions:
+      contents: read
+
   publish:
+    needs: gitleaks
     runs-on: ubuntu-latest
 
     steps:
