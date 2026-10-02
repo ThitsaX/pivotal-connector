@@ -99,27 +99,6 @@ Build a packaged application:
 mvn clean package
 ```
 
-## Secret scanning setup
-
-Run the platform-specific setup once per clone:
-
-macOS or Linux:
-
-```bash
-make setup-secrets
-```
-
-Windows PowerShell:
-
-```powershell
-.\scripts\setup-secrets.ps1
-```
-
-The setup installs pre-commit if needed and enables the local hook. Gitleaks is
-installed by pre-commit at the pinned version in `.pre-commit-config.yaml`, so
-you do not need to install it separately. GitHub Actions also runs Gitleaks
-independently of the local hook.
-
 ## Project Layout
 
 - `pom.xml` - parent Maven build

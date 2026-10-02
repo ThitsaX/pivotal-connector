@@ -2,7 +2,5 @@ repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks:
-      - id: gitleaks
-        args:
-          - --config
-          - .gitleaks.toml
+      - id: gitleaks-system
+        pass_filenames: false
