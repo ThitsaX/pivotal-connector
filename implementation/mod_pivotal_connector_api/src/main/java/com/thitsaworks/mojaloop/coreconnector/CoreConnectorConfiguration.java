@@ -195,6 +195,17 @@ public class CoreConnectorConfiguration {
 
         private final long fspiopMtlsReloadIntervalMs;
 
+        // ── FSPIOP bearer token (hub-facing leg) ─────────────────────────────
+        // Required when callbacks go through the Hub's API gateway, which checks a token as well as
+        // the client certificate. All three or none: none means the Hub is reached where no token is
+        // checked.
+
+        private final String fspiopOauthTokenUrl;
+
+        private final String fspiopOauthClientId;
+
+        private final String fspiopOauthClientSecret;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -247,6 +258,19 @@ public class CoreConnectorConfiguration {
             this.fspiopMtlsClientCertPath = prop("fspiopMtlsClientCertPath", "");
             this.fspiopMtlsClientKeyPath = prop("fspiopMtlsClientKeyPath", "");
             this.fspiopMtlsReloadIntervalMs = propLong("fspiopMtlsReloadIntervalMs", 60_000L);
+
+            this.fspiopOauthTokenUrl = prop("fspiopOauthTokenUrl", "");
+            this.fspiopOauthClientId = prop("fspiopOauthClientId", "");
+            // Also read from the environment directly. Everything else here arrives as a -D
+            // argument, which any process in the container can read from the command line; a
+            // credential should not, so the entrypoint does not pass it that way.
+            this.fspiopOauthClientSecret = prop("fspiopOauthClientSecret", envOrEmpty("FSPIOP_OAUTH_CLIENT_SECRET"));
+        }
+
+        private static String envOrEmpty(String name) {
+
+            String value = System.getenv(name);
+            return value == null ? "" : value;
         }
 
         private static String prop(String key, String def) {
