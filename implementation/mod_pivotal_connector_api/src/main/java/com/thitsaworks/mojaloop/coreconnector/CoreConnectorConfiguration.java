@@ -244,14 +244,16 @@ public class CoreConnectorConfiguration {
             this.vaultRole = prop("vaultRole", "");
             this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
             this.vaultKvMount = prop("vaultKvMount", "secret");
-            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey");
+            // The defaults below are Vault paths, not credentials; the scanner reads "key" in the
+            // names as a secret, so they are marked inline rather than by line in .gitleaksignore.
+            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey"); // gitleaks:allow
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
 
             this.keyProvider = prop("keyProvider", "vault-kv");
             this.hsmCredPath = prop("hsmCredPath", "");
-            this.keyRefPathPrefix = prop("keyRefPathPrefix", "pivotal/keyref");
+            this.keyRefPathPrefix = prop("keyRefPathPrefix", "pivotal/keyref"); // gitleaks:allow
 
             this.fspiopUseMutualTls = propBoolean("fspiopUseMutualTls", false);
             this.fspiopMtlsCaPath = prop("fspiopMtlsCaPath", "");
