@@ -15,8 +15,8 @@
  */
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
-public enum TransactionStatus {
-    SUCCESS,
-    PENDING,
-    FAILED
+public interface DisputeStatusClient {
+
+    DisputeStatus checkStatus(String transactionId);
+
 }

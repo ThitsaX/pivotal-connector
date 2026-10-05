@@ -16,6 +16,7 @@
 
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
+import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ExtensionList;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DisputeResult;
 import org.slf4j.Logger;
@@ -23,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,43 +35,57 @@ public class DisputeStatusStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusStore.class);
 
-    private static final long STATUS_CHECK_PERIOD_MINUTES = 1L;
-
     private final Map<String, DisputedTransaction> disputedTransactions = new ConcurrentHashMap<>();
 
-    private final Map<String, DisputeResult.Response> disputeResults = new ConcurrentHashMap<>();
+    private final Duration schedulerInterval;
 
-    public void storeDisputedTransaction(String transferId, ExtensionList extensionList) {
+    public DisputeStatusStore(CoreConnectorConfiguration.Settings settings) {
 
-        if (!StringUtils.hasLength(transferId)) {
-            LOG.info("Ignoring dispute store request because transferId is blank.");
+        this.schedulerInterval = Duration.ofMinutes(settings.getDisputeSchedulerIntervalMinutes());
+    }
+
+    public void storeDisputedTransaction(String transactionId, ExtensionList extensionList) {
+
+        if (!StringUtils.hasLength(transactionId)) {
+            LOG.info("Ignoring dispute store request because transactionId is blank.");
             return;
         }
 
+        Instant disputedDateTime = Instant.now();
+        Instant nextCheckAt = calculateNextCheckAt(
+            disputedDateTime,
+            this.schedulerInterval);
+
         DisputedTransaction disputedTransaction = new DisputedTransaction(
-            transferId,
+            transactionId,
+            disputedDateTime,
             extensionList,
-            System.currentTimeMillis());
+            Duration.between(disputedDateTime, nextCheckAt),
+            nextCheckAt,
+            null,
+            null);
 
         DisputedTransaction existingDisputedTransaction = this.disputedTransactions.putIfAbsent(
-            transferId,
+            transactionId,
             disputedTransaction);
 
         LOG.info(
-            "Dispute store requested for transferId {} with extensionList={}. Current disputed transaction count={}.",
-            transferId, extensionList, this.disputedTransactions.size());
+            "Dispute store requested for transactionId {} with extensionList={}. Current disputed transaction count={}.",
+            transactionId, extensionList, this.disputedTransactions.size());
 
         if (existingDisputedTransaction == null) {
 
             LOG.info(
-                "Stored transferId {} as a disputed transaction at {}. It will be checked every {} minute(s).",
-                transferId, disputedTransaction.disputedAt(), STATUS_CHECK_PERIOD_MINUTES);
+                "Stored transactionId {} as a disputed transaction at {}. It will be checked every {} minute(s).",
+                transactionId, disputedTransaction.disputedDateTime(),
+                this.schedulerInterval.toMinutes());
 
         } else {
 
             LOG.info(
-                "Dispute already exists for transferId {}. It was first stored at {}. Current disputed transaction count={}.",
-                transferId, existingDisputedTransaction.disputedAt(), this.disputedTransactions.size());
+                "Dispute already exists for transactionId {}. It was first stored at {}. Current disputed transaction count={}.",
+                transactionId, existingDisputedTransaction.disputedDateTime(),
+                this.disputedTransactions.size());
         }
     }
 
@@ -77,14 +94,9 @@ public class DisputeStatusStore {
         return this.disputedTransactions.values();
     }
 
-    public void removeDisputedTransaction(String transferId) {
+    public void removeDisputedTransaction(String transactionId) {
 
-        this.disputedTransactions.remove(transferId);
-    }
-
-    public void saveDisputeResult(String transferId, boolean dispute) {
-
-        this.disputeResults.put(transferId, new DisputeResult.Response(dispute));
+        this.disputedTransactions.remove(transactionId);
     }
 
     public int getPendingDisputedTransactionCount() {
@@ -92,13 +104,21 @@ public class DisputeStatusStore {
         return this.disputedTransactions.size();
     }
 
-    public int getDisputeResultCount() {
+    public static Instant calculateNextCheckAt(Instant disputedDateTime, Duration schedulerInterval) {
 
-        return this.disputeResults.size();
+        long intervalMillis = schedulerInterval.toMillis();
+        long disputedMillis = disputedDateTime.toEpochMilli();
+        long nextBoundaryMillis = ((disputedMillis / intervalMillis) + 1) * intervalMillis;
+
+        return Instant.ofEpochMilli(nextBoundaryMillis);
     }
 
-    public record DisputedTransaction(String transferId,
+    public record DisputedTransaction(String transactionId,
+                                      Instant disputedDateTime,
                                       ExtensionList extensionList,
-                                      long disputedAt) { }
+                                      Duration disputedDuration,
+                                      Instant nextCheckAt,
+                                      Instant lastStatusCheckDateTime,
+                                      String lastKnownStatus) { }
 
 }

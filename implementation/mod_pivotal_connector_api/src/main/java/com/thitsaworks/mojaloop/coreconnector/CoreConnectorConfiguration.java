@@ -157,6 +157,8 @@ public class CoreConnectorConfiguration {
 
         private final long fspiopMtlsReloadIntervalMs;
 
+        private final int disputeSchedulerIntervalMinutes;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -205,6 +207,10 @@ public class CoreConnectorConfiguration {
             this.fspiopMtlsClientCertPath = prop("fspiopMtlsClientCertPath", "");
             this.fspiopMtlsClientKeyPath = prop("fspiopMtlsClientKeyPath", "");
             this.fspiopMtlsReloadIntervalMs = propLong("fspiopMtlsReloadIntervalMs", 60_000L);
+
+            this.disputeSchedulerIntervalMinutes = propPositiveInt(
+                "disputeSchedulerIntervalMinutes",
+                1);
         }
 
         private static String prop(String key, String def) {
@@ -238,6 +244,22 @@ public class CoreConnectorConfiguration {
             } catch (NumberFormatException e) {
                 return def;
             }
+        }
+
+        private static int propPositiveInt(String key, int def) {
+
+            String value = prop(key, String.valueOf(def));
+            try {
+                int parsedValue = Integer.parseInt(value);
+                if (parsedValue > 0) {
+                    return parsedValue;
+                }
+            } catch (NumberFormatException ignored) {
+                // Handled below with a startup error that names the invalid property.
+            }
+
+            throw new IllegalArgumentException(
+                key + " must be a positive integer, but was '" + value + "'.");
         }
 
         private static long propLong(String key, long def) {
