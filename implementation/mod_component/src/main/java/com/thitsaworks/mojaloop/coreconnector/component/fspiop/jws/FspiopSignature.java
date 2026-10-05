@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
+import java.security.Provider;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.util.Base64;
@@ -81,6 +82,25 @@ public final class FspiopSignature {
                               FspiopProtectedHeader.Input input,
                               byte[] payload) {
 
+        return sign(privateKey, null, input, payload);
+    }
+
+    /**
+     * Signs with a key held inside a device, which must be used through the provider that owns it.
+     * <p>
+     * {@code Signature.getInstance(algorithm)} selects a provider by <em>algorithm</em>, not by key,
+     * so it returns the software RSA implementation — which then rejects a PKCS#11 key with
+     * {@code InvalidKeyException}, because it cannot read the material. Being unable to read it is
+     * the whole point of that key, so the provider has to be named rather than inferred.
+     *
+     * @param provider the provider that owns {@code privateKey}, or {@code null} for a key this
+     *     process holds as material
+     */
+    public static Header sign(PrivateKey privateKey,
+                              Provider provider,
+                              FspiopProtectedHeader.Input input,
+                              byte[] payload) {
+
         assertSupported(input.algorithm());
 
         String protectedHeader = encode(
@@ -88,7 +108,9 @@ public final class FspiopSignature {
         String encodedPayload = encode(payload);
 
         try {
-            Signature signature = Signature.getInstance(JCA_ALGORITHM);
+            Signature signature = provider == null
+                ? Signature.getInstance(JCA_ALGORITHM)
+                : Signature.getInstance(JCA_ALGORITHM, provider);
             signature.initSign(privateKey);
             signature.update(signingInput(protectedHeader, encodedPayload));
 
