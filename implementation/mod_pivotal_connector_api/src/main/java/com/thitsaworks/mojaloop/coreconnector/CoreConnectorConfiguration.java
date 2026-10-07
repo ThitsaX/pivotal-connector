@@ -225,7 +225,7 @@ public class CoreConnectorConfiguration {
             this.vaultRole = prop("vaultRole", "");
             this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
             this.vaultKvMount = prop("vaultKvMount", "secret");
-            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey");
+            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "");
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
