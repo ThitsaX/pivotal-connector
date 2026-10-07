@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
-public interface DisputeStatusClient {
+import java.time.Instant;
 
-    DisputeStatus checkStatus(String transactionId, String homeTransactionId);
-
-}
+public record DisputedTransaction(String transactionId,
+                                  String homeTransactionId,
+                                  Instant disputedDateTime) { }

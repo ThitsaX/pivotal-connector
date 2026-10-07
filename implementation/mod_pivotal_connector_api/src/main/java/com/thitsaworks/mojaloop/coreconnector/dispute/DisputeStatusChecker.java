@@ -26,6 +26,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -33,8 +35,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 @ConditionalOnProperty(
     name = "disputeSchedulerEnabled",
-    havingValue = "true"
-)
+    havingValue = "true")
 public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusChecker.class);
@@ -77,8 +78,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         this.checker.scheduleAtFixedRate(
             this::checkDisputedTransaction,
             this.settings.getDisputeSchedulerIntervalMinutes(),
-            this.settings.getDisputeSchedulerIntervalMinutes(),
-            TimeUnit.MINUTES);
+            this.settings.getDisputeSchedulerIntervalMinutes(), TimeUnit.MINUTES);
     }
 
     @Override
@@ -91,18 +91,23 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private void checkDisputedTransaction() {
 
+        Instant schedulerRuntime = Instant.now();
+
         LOG.info(
             "Running dispute status check with disputed transaction count={}.",
             this.disputeStatusStore.getPendingDisputedTransactionCount());
 
         this.disputeStatusStore.getPendingDisputedTransactions().forEach(disputedTransaction -> {
 
-            LOG.info(
-                "Evaluating disputed transactionId {}. disputeDuration={} ms, readyForStatusCheck={}.",
-                disputedTransaction.transactionId(), this.getDisputeDurationMillis(disputedTransaction),
-                this.isReadyForStatusCheck(disputedTransaction));
+            Duration elapsed = this.getDisputeDuration(disputedTransaction, schedulerRuntime);
 
-            if (this.isReadyForStatusCheck(disputedTransaction)) {
+            LOG.info(
+                "Evaluating disputed transactionId {}, disputeElapsedDuration={} seconds, readyForStatusCheck={}.",
+                disputedTransaction.transactionId(), elapsed.toSeconds(),
+                this.isReadyForStatusCheck(elapsed));
+
+            if (this.isReadyForStatusCheck(elapsed)) {
+
                 try {
                     this.checkDisputedTransaction(disputedTransaction);
                 } catch (Exception e) {
@@ -114,12 +119,12 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         });
     }
 
-    private void checkDisputedTransaction(DisputeStatusStore.DisputedTransaction disputedTransaction)
+    private void checkDisputedTransaction(DisputedTransaction disputedTransaction)
         throws Exception {
 
         LOG.info(
-            "Checking disputed transaction for transactionId {} with extensionList={}.",
-            disputedTransaction.transactionId(), disputedTransaction.extensionList());
+            "Checking disputed transaction for transactionId {}.",
+            disputedTransaction.transactionId());
 
         DisputeStatus disputeStatus = this.resolveDisputeStatus(disputedTransaction);
 
@@ -136,6 +141,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
             LOG.info(
                 "Confirmed dispute for transactionId {} because transaction status is not successful.",
                 disputedTransaction.transactionId());
+
             return;
         }
 
@@ -144,10 +150,12 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
             disputedTransaction.transactionId());
 
         this.auditPublisherService.publishDisputeStatus(
-            new AuditPublisherService.DisputeResultInput(disputedTransaction.transactionId(), false));
+            new AuditPublisherService.DisputeResultInput(
+                disputedTransaction.transactionId(),
+                false));
     }
 
-    private DisputeStatus resolveDisputeStatus(DisputeStatusStore.DisputedTransaction disputedTransfer) {
+    private DisputeStatus resolveDisputeStatus(DisputedTransaction disputedTransfer) {
 
         try {
 
@@ -156,7 +164,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
                 disputedTransfer.transactionId());
 
             DisputeStatus disputeStatus = this.disputeStatusClient.checkStatus(
-                disputedTransfer.transactionId());
+                disputedTransfer.transactionId(), disputedTransfer.homeTransactionId());
 
             if (disputeStatus == null) {
                 LOG.info(
@@ -167,8 +175,8 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
             }
 
             LOG.info(
-                "Get Transaction Status returned {} for transactionId {}.",
-                disputeStatus, disputedTransfer.transactionId());
+                "Get Transaction Status returned {} for transactionId {}.", disputeStatus,
+                disputedTransfer.transactionId());
 
             return disputeStatus;
 
@@ -182,19 +190,22 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         }
     }
 
-    private boolean isReadyForStatusCheck(DisputeStatusStore.DisputedTransaction disputedTransfer) {
+    private boolean isReadyForStatusCheck(Duration elapsed) {
 
-        return System.currentTimeMillis() - disputedTransfer.disputedDateTime().toEpochMilli() >=
-                   TimeUnit.MINUTES.toMillis(1);
+        Duration configuredInterval = Duration.ofMinutes(
+            this.settings.getDisputeSchedulerIntervalMinutes());
+
+        return elapsed.compareTo(configuredInterval) >= 0;
     }
 
-    private long getDisputeDurationMillis(DisputeStatusStore.DisputedTransaction disputedTransaction) {
+    private Duration getDisputeDuration(DisputedTransaction disputedTransaction,
+                                        Instant schedulerRuntime) {
 
         LOG.info(
-            "Getting dispute duration for transactionId {}, disputed at {}.",
+            "Getting dispute duration for transactionId {}, disputed date time {}.",
             disputedTransaction.transactionId(), disputedTransaction.disputedDateTime());
 
-        return System.currentTimeMillis() - disputedTransaction.disputedDateTime().toEpochMilli();
+        return Duration.between(disputedTransaction.disputedDateTime(), schedulerRuntime);
     }
 
 }
