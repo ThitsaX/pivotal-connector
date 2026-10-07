@@ -13,16 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.retrofit;
 
-import okhttp3.*;
+import okhttp3.Connection;
+import okhttp3.Dns;
+import okhttp3.Handshake;
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import retrofit2.Converter;
 import retrofit2.Retrofit;
 
-import javax.net.ssl.*;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSession;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetAddress;
@@ -37,6 +51,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -52,7 +67,6 @@ public class RetrofitServiceBuilder<S> {
 
     private HttpLoggingInterceptor loggingInterceptor = null;
 
-
     public RetrofitServiceBuilder(Class<S> service, String baseUrl) {
 
         this.service = service;
@@ -60,69 +74,26 @@ public class RetrofitServiceBuilder<S> {
 
     }
 
-    public RetrofitServiceBuilder<S> withHttpLog(HttpLoggingInterceptor.Level level, boolean enableMasking) {
+    public RetrofitServiceBuilder<S> withHttpLog(HttpLoggingInterceptor.Level level,
+                                                 boolean enableMasking) {
+
+        return this.withHttpLog(level, enableMasking, Set.of(), Set.of());
+    }
+
+    public RetrofitServiceBuilder<S> withHttpLog(HttpLoggingInterceptor.Level level,
+                                                 boolean enableMasking,
+                                                 Set<String> additionalSensitiveFields,
+                                                 Set<String> additionalSensitiveHeaders) {
+
+        Set<String> sensitiveFields =
+            additionalSensitiveFields == null ? Set.of() : Set.copyOf(additionalSensitiveFields);
+        Set<String> sensitiveHeaders =
+            additionalSensitiveHeaders == null ? Set.of() : Set.copyOf(additionalSensitiveHeaders);
 
         HttpLoggingInterceptor.Logger logger;
 
         if (enableMasking) {
-            logger = message -> {
-                // First process JSON fields
-                String sanitized = message;
-
-                // Mask credentials in JSON request bodies. PIN values are always fully hidden.
-                Pattern
-                    jsonPattern =
-                    Pattern.compile("(?i)(\"([^\"]+)\"\\s*:\\s*\")([^\"]*)(\")");
-                Matcher jsonMatcher = jsonPattern.matcher(message);
-                StringBuffer jsonResult = new StringBuffer();
-                while (jsonMatcher.find()) {
-                    String fieldName = jsonMatcher.group(2);
-                    String value = jsonMatcher.group(3);
-                    String masked = value;
-
-                    if (fieldName != null && fieldName.equalsIgnoreCase("username")) {
-                        masked = maskUsername(value);
-                    } else if (fieldName != null && fieldName.matches("(?i)user|pwd")) {
-                        masked = value.length() > 3
-                                     ? "****" + value.substring(value.length() - 3)
-                                     : "****";
-                    } else if (fieldName != null && fieldName.matches("(?i)pincode|pinCode")) {
-                        masked = "****";
-                    } else if (fieldName != null && fieldName.matches("(?i)access_token|password")) {
-                        masked = "****";
-                    }
-
-                    jsonMatcher.appendReplacement(jsonResult, jsonMatcher.group(1) + masked + jsonMatcher.group(4));
-                }
-                jsonMatcher.appendTail(jsonResult);
-                sanitized = jsonResult.toString();
-
-                // Then process query parameters
-                Pattern paramPattern = Pattern.compile(
-                    "(?i)((?:auth:(?:user|pwd)|X-PI-Client-Id|X-PI-Client-Secret|grant_type)=)([^&\\s]*)"
-                                                      );
-                Matcher paramMatcher = paramPattern.matcher(sanitized);
-                StringBuffer paramResult = new StringBuffer();
-                while (paramMatcher.find()) {
-                    String key = paramMatcher.group(1);
-                    String value = paramMatcher.group(2);
-                    String masked;
-
-                    if (key != null && key.matches("(?i)grant_type=")) {
-                        masked = "****";
-                    } else {
-                        masked = value.length() > 3
-                                     ? "****" + value.substring(value.length() - 3)
-                                     : "****";
-                    }
-
-                    paramMatcher.appendReplacement(paramResult, "$1" + masked);
-                }
-                paramMatcher.appendTail(paramResult);
-                sanitized = paramResult.toString();
-
-                LOGGER.info(sanitized);
-            };
+            logger = message -> LOGGER.info(maskHttpLog(message, sensitiveFields));
         } else {
             logger = LOGGER::info;
         }
@@ -135,10 +106,74 @@ public class RetrofitServiceBuilder<S> {
         loggingInterceptor.redactHeader("secret-key");
         loggingInterceptor.redactHeader("secret-id");
         loggingInterceptor.redactHeader("currentMemberId");
+        sensitiveHeaders
+            .stream()
+            .filter(header -> header != null && !header.isBlank())
+            .forEach(loggingInterceptor::redactHeader);
 
         this.httpClientBuilder.addInterceptor(loggingInterceptor);
 
         return this;
+    }
+
+    static String maskHttpLog(String message, Set<String> additionalSensitiveFields) {
+
+        // First process JSON fields. Connector-specific fields are always fully hidden.
+        Pattern jsonPattern = Pattern.compile("(?i)(\"([^\"]+)\"\\s*:\\s*\")([^\"]*)(\")");
+        Matcher jsonMatcher = jsonPattern.matcher(message);
+        StringBuffer jsonResult = new StringBuffer();
+        while (jsonMatcher.find()) {
+            String fieldName = jsonMatcher.group(2);
+            String value = jsonMatcher.group(3);
+            String masked = value;
+
+            if (containsIgnoreCase(additionalSensitiveFields, fieldName)) {
+                masked = "****";
+            } else if (fieldName != null && fieldName.equalsIgnoreCase("username")) {
+                masked = maskUsername(value);
+            } else if (fieldName != null && fieldName.matches("(?i)user|pwd")) {
+                masked = value.length() > 3 ? "****" + value.substring(value.length() - 3) : "****";
+            } else if (fieldName != null && fieldName.matches("(?i)pincode|pinCode")) {
+                masked = "****";
+            } else if (fieldName != null && fieldName.matches("(?i)access_token|password")) {
+                masked = "****";
+            }
+
+            jsonMatcher.appendReplacement(
+                jsonResult,
+                Matcher.quoteReplacement(jsonMatcher.group(1) + masked + jsonMatcher.group(4)));
+        }
+        jsonMatcher.appendTail(jsonResult);
+
+        // Then process query parameters.
+        Pattern paramPattern = Pattern.compile(
+            "(?i)((?:auth:(?:user|pwd)|X-PI-Client-Id|X-PI-Client-Secret|grant_type)=)([^&\\s]*)");
+        Matcher paramMatcher = paramPattern.matcher(jsonResult.toString());
+        StringBuffer paramResult = new StringBuffer();
+        while (paramMatcher.find()) {
+            String key = paramMatcher.group(1);
+            String value = paramMatcher.group(2);
+            String masked;
+
+            if (key != null && key.matches("(?i)grant_type=")) {
+                masked = "****";
+            } else {
+                masked = value.length() > 3 ? "****" + value.substring(value.length() - 3) : "****";
+            }
+
+            paramMatcher.appendReplacement(paramResult, Matcher.quoteReplacement(key + masked));
+        }
+        paramMatcher.appendTail(paramResult);
+        return paramResult.toString();
+    }
+
+    private static boolean containsIgnoreCase(Set<String> values, String candidate) {
+
+        return candidate != null && values != null && values
+                                                          .stream()
+                                                          .anyMatch(value -> value != null &&
+                                                                                 value.equalsIgnoreCase(
+                                                                                     candidate));
     }
 
     private static String maskUsername(String value) {
@@ -156,11 +191,11 @@ public class RetrofitServiceBuilder<S> {
 
     public S build() {
 
-        Retrofit retrofit = this.retrofitBuilder.client(this.httpClientBuilder.build())
-                                                .build();
+        Retrofit retrofit = this.retrofitBuilder.client(this.httpClientBuilder.build()).build();
 
         return retrofit.create(this.service);
     }
+
     public S buildformtn() {
 
         if (this.loggingInterceptor != null) {
@@ -182,13 +217,15 @@ public class RetrofitServiceBuilder<S> {
             KeyStore keyStore = KeyStore.getInstance("PKCS12");
             keyStore.load(clientCertInputStream, clientCertPassword.toCharArray());
 
-            KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+            KeyManagerFactory kmf = KeyManagerFactory.getInstance(
+                KeyManagerFactory.getDefaultAlgorithm());
             kmf.init(keyStore, clientCertPassword.toCharArray());
 
             KeyStore trustStore = KeyStore.getInstance("PKCS12");
             trustStore.load(trustStoreInputStream, trustStorePassword.toCharArray());
 
-            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+                TrustManagerFactory.getDefaultAlgorithm());
             tmf.init(trustStore);
 
             SSLContext sslContext = SSLContext.getInstance("TLS"); // try 1.2 first
@@ -198,7 +235,8 @@ public class RetrofitServiceBuilder<S> {
 
             this.httpClientBuilder.sslSocketFactory(sslContext.getSocketFactory(), tm);
 
-            okhttp3.ConnectionSpec spec = new okhttp3.ConnectionSpec.Builder(okhttp3.ConnectionSpec.MODERN_TLS).tlsVersions(okhttp3.TlsVersion.TLS_1_2).build();
+            okhttp3.ConnectionSpec spec = new okhttp3.ConnectionSpec.Builder(
+                okhttp3.ConnectionSpec.MODERN_TLS).tlsVersions(okhttp3.TlsVersion.TLS_1_2).build();
             this.httpClientBuilder.connectionSpecs(List.of(spec));
             this.httpClientBuilder.hostnameVerifier((hostname, session) -> true);
 
@@ -208,7 +246,6 @@ public class RetrofitServiceBuilder<S> {
 
         return this;
     }
-
 
     /** Enable TLS/connection debug using a network interceptor (no EventListener needed). */
     public RetrofitServiceBuilder<S> withTlsDebug() {
@@ -221,7 +258,9 @@ public class RetrofitServiceBuilder<S> {
     /** Wrap Dns with debug logs (helps validate host→IP mapping for SNI issues). */
     public RetrofitServiceBuilder<S> withDnsDebug() {
 
-        Dns current = this.httpClientBuilder.build().dns(); // get existing (SYSTEM unless overridden)
+        Dns current = this.httpClientBuilder
+                          .build()
+                          .dns(); // get existing (SYSTEM unless overridden)
         this.httpClientBuilder.dns(new DnsDebug(current));
         return this;
     }
@@ -284,14 +323,14 @@ public class RetrofitServiceBuilder<S> {
             new X509TrustManager() {
 
                 @Override
-                public void checkClientTrusted(java.security.cert.X509Certificate[] chain, String authType)
-                    throws CertificateException {
+                public void checkClientTrusted(java.security.cert.X509Certificate[] chain,
+                                               String authType) throws CertificateException {
 
                 }
 
                 @Override
-                public void checkServerTrusted(java.security.cert.X509Certificate[] chain, String authType)
-                    throws CertificateException {
+                public void checkServerTrusted(java.security.cert.X509Certificate[] chain,
+                                               String authType) throws CertificateException {
 
                 }
 
@@ -314,7 +353,8 @@ public class RetrofitServiceBuilder<S> {
 
             final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
 
-            this.httpClientBuilder.sslSocketFactory(sslSocketFactory, (X509TrustManager) trustManager[0]);
+            this.httpClientBuilder.sslSocketFactory(
+                sslSocketFactory, (X509TrustManager) trustManager[0]);
             this.httpClientBuilder.hostnameVerifier(new HostnameVerifier() {
 
                 @Override
@@ -335,7 +375,8 @@ public class RetrofitServiceBuilder<S> {
         return this;
     }
 
-    public RetrofitServiceBuilder<S> withHttpLogging(HttpLoggingInterceptor.Level level, boolean info) {
+    public RetrofitServiceBuilder<S> withHttpLogging(HttpLoggingInterceptor.Level level,
+                                                     boolean info) {
 
         HttpLoggingInterceptor logging = new HttpLoggingInterceptor(message -> {
             if (info) {
@@ -352,7 +393,8 @@ public class RetrofitServiceBuilder<S> {
         return this;
     }
 
-    public RetrofitServiceBuilder<S> withHttpLoggingformtn(HttpLoggingInterceptor.Level level, boolean info) {
+    public RetrofitServiceBuilder<S> withHttpLoggingformtn(HttpLoggingInterceptor.Level level,
+                                                           boolean info) {
 
         this.loggingInterceptor = new HttpLoggingInterceptor(message -> {
             if (info) {
@@ -382,9 +424,12 @@ public class RetrofitServiceBuilder<S> {
         return this;
     }
 
-    public RetrofitServiceBuilder<S> withTimeouts(int connectTimeout, int callTimeout, int readTimeout) {
+    public RetrofitServiceBuilder<S> withTimeouts(int connectTimeout,
+                                                  int callTimeout,
+                                                  int readTimeout) {
 
-        this.httpClientBuilder.connectTimeout(Duration.ofSeconds(connectTimeout <= 0 ? 60 : connectTimeout));
+        this.httpClientBuilder.connectTimeout(
+            Duration.ofSeconds(connectTimeout <= 0 ? 60 : connectTimeout));
         this.httpClientBuilder.callTimeout(Duration.ofSeconds(callTimeout <= 0 ? 60 : callTimeout));
         this.httpClientBuilder.readTimeout(Duration.ofSeconds(readTimeout <= 0 ? 60 : readTimeout));
 
@@ -444,7 +489,9 @@ public class RetrofitServiceBuilder<S> {
             }
 
             if (hs != null) {
-                LOGGER.info("TLS-HS end  host(SNI)={} version={} cipher={}", host, hs.tlsVersion(), hs.cipherSuite());
+                LOGGER.info(
+                    "TLS-HS end  host(SNI)={} version={} cipher={}", host, hs.tlsVersion(),
+                    hs.cipherSuite());
                 logPeerCerts(hs.peerCertificates());
             } else {
                 LOGGER.warn("TLS-HS end  host(SNI)={} (no handshake info)", host);
@@ -452,17 +499,22 @@ public class RetrofitServiceBuilder<S> {
 
             Connection connAfter = chain.connection();
             if (connAfter != null) {
-                LOGGER.info("TLS-CONN route={} protocol={}", connAfter.route(), connAfter.protocol());
+                LOGGER.info(
+                    "TLS-CONN route={} protocol={}", connAfter.route(), connAfter.protocol());
             }
 
             return resp;
         }
+
     }
+
     private static void logConn(String phase, String host, Connection conn) {
 
         Handshake hs = conn.handshake();
         if (hs != null) {
-            LOGGER.info("TLS-HS {}  host(SNI)={} version={} cipher={}", phase, host, hs.tlsVersion(), hs.cipherSuite());
+            LOGGER.info(
+                "TLS-HS {}  host(SNI)={} version={} cipher={}", phase, host, hs.tlsVersion(),
+                hs.cipherSuite());
         } else {
             LOGGER.info("TLS-HS {}  host(SNI)={} (no handshake yet)", phase, host);
         }
@@ -477,7 +529,9 @@ public class RetrofitServiceBuilder<S> {
                 X509Certificate x = (X509Certificate) c;
                 String subj = x.getSubjectX500Principal().getName();
                 String issuer = x.getIssuerX500Principal().getName();
-                LOGGER.info("TLS-PEER[{}] subject='{}' issuer='{}' notBefore={} notAfter={}", i, subj, issuer, x.getNotBefore(), x.getNotAfter());
+                LOGGER.info(
+                    "TLS-PEER[{}] subject='{}' issuer='{}' notBefore={} notAfter={}", i, subj,
+                    issuer, x.getNotBefore(), x.getNotAfter());
 
                 try {
                     Collection<List<?>> sans = x.getSubjectAlternativeNames();
@@ -498,7 +552,7 @@ public class RetrofitServiceBuilder<S> {
                 LOGGER.info("TLS-PEER[{}] type={}", i, c.getType());
             }
             i++;
-        }}
-
+        }
+    }
 
 }
