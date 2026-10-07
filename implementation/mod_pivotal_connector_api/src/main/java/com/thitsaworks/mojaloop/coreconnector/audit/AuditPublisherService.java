@@ -47,6 +47,8 @@ public class AuditPublisherService {
 
     private static final String CONNECTOR_GATEWAY = "CONNECTOR";
 
+    private static final String RESOLVED = "RESOLVED";
+
     private final NatsService natsService;
 
     private final CoreConnectorConfiguration.Settings config;
@@ -110,7 +112,27 @@ public class AuditPublisherService {
                 input.correlationId, input.payeeMobile(), input.amount(), input.homeTransactionId());
     }
 
-    private synchronized void ensureStream() throws Exception {
+
+    public void publishDisputeStatus(DisputeResultInput input) throws Exception {
+
+        Map<String, Object> content = new LinkedHashMap<>();
+        content.put("correlationId", input.transactionId());
+        content.put("occurredAt", Instant.now().toString() );
+
+        Map<String, Object> message = new LinkedHashMap<>();
+        message.put("phase", PATCH_PHASE);
+        message.put("action", RESOLVED );
+        message.put("gateway", CONNECTOR_GATEWAY);
+        message.put("content", content);
+
+        this.natsService.jetstream().publish(SUBJECT, this.natsService.serialize(message));
+
+        LOG.info(
+            "Published Dispute RESOLVED audit transferId={} dispute=false",
+            input.transactionId);
+        
+    }
+        private synchronized void ensureStream() throws Exception {
 
         if (streamResolved) {
             return;
@@ -158,5 +180,7 @@ public class AuditPublisherService {
                                     String payeeMobile,
                                     String amount,
                                     String homeTransactionId) { }
+
+    public record DisputeResultInput(String transactionId) { }
 
 }

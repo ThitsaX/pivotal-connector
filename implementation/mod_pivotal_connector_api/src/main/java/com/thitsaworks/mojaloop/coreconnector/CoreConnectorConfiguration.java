@@ -183,6 +183,10 @@ public class CoreConnectorConfiguration {
 
         private final long fspiopMtlsReloadIntervalMs;
 
+        private final int disputeSchedulerIntervalMinutes;
+
+        private final int disputeStatusCheckDelaySeconds;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -221,7 +225,7 @@ public class CoreConnectorConfiguration {
             this.vaultRole = prop("vaultRole", "");
             this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
             this.vaultKvMount = prop("vaultKvMount", "secret");
-            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "pivotal/jwskey");
+            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "");
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
@@ -231,6 +235,14 @@ public class CoreConnectorConfiguration {
             this.fspiopMtlsClientCertPath = prop("fspiopMtlsClientCertPath", "");
             this.fspiopMtlsClientKeyPath = prop("fspiopMtlsClientKeyPath", "");
             this.fspiopMtlsReloadIntervalMs = propLong("fspiopMtlsReloadIntervalMs", 60_000L);
+
+            this.disputeSchedulerIntervalMinutes = propPositiveInt(
+                "disputeSchedulerIntervalMinutes",
+                1);
+
+            this.disputeStatusCheckDelaySeconds = propPositiveInt(
+                "disputeStatusCheckDelaySeconds",
+                30);
         }
 
         private static String prop(String key, String def) {
@@ -264,6 +276,22 @@ public class CoreConnectorConfiguration {
             } catch (NumberFormatException e) {
                 return def;
             }
+        }
+
+        private static int propPositiveInt(String key, int def) {
+
+            String value = prop(key, String.valueOf(def));
+            try {
+                int parsedValue = Integer.parseInt(value);
+                if (parsedValue > 0) {
+                    return parsedValue;
+                }
+            } catch (NumberFormatException ignored) {
+                // Handled below with a startup error that names the invalid property.
+            }
+
+            throw new IllegalArgumentException(
+                key + " must be a positive integer, but was '" + value + "'.");
         }
 
         private static long propLong(String key, long def) {
