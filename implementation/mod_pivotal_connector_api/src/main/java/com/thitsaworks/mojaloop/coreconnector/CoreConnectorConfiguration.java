@@ -159,6 +159,8 @@ public class CoreConnectorConfiguration {
 
         private final int disputeSchedulerIntervalMinutes;
 
+        private final int disputeStatusCheckDelayMinutes;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -210,6 +212,10 @@ public class CoreConnectorConfiguration {
 
             this.disputeSchedulerIntervalMinutes = propPositiveInt(
                 "disputeSchedulerIntervalMinutes",
+                1);
+
+            this.disputeStatusCheckDelayMinutes = propPositiveInt(
+                "disputeStatusCheckDelayMinutes",
                 1);
         }
 

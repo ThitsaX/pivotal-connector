@@ -192,10 +192,10 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private boolean isReadyForStatusCheck(Duration elapsed) {
 
-        Duration configuredInterval = Duration.ofMinutes(
-            this.settings.getDisputeSchedulerIntervalMinutes());
+        Duration disputeStatusCheckDelay = Duration.ofMinutes(
+            this.settings.getDisputeStatusCheckDelayMinutes());
 
-        return elapsed.compareTo(configuredInterval) >= 0;
+        return elapsed.compareTo(disputeStatusCheckDelay) >= 0;
     }
 
     private Duration getDisputeDuration(DisputedTransaction disputedTransaction,
