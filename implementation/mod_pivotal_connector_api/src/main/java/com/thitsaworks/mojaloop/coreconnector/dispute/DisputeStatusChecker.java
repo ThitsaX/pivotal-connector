@@ -94,15 +94,15 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         Instant schedulerRuntime = Instant.now();
 
         LOG.info(
-            "Running dispute status check with disputed transaction count={}.",
-            this.disputeStatusStore.getPendingDisputedTransactionCount());
+            "Running dispute status check with disputed transaction count={}, schedulerRuntime={}, connectorId={}.",
+            this.disputeStatusStore.getPendingDisputedTransactionCount(), schedulerRuntime, this.settings.getConnectorId());
 
         this.disputeStatusStore.getPendingDisputedTransactions().forEach(disputedTransaction -> {
 
             Duration elapsed = this.getDisputeDuration(disputedTransaction, schedulerRuntime);
 
             LOG.info(
-                "Evaluating disputed transactionId {}, disputeElapsedDuration={} seconds, readyForStatusCheck={}.",
+                "Evaluating disputed transactionId {}, disputeElapsedDuration= {}seconds, readyForStatusCheck={}.",
                 disputedTransaction.transactionId(), elapsed.toSeconds(),
                 this.isReadyForStatusCheck(elapsed));
 
@@ -151,8 +151,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
         this.auditPublisherService.publishDisputeStatus(
             new AuditPublisherService.DisputeResultInput(
-                disputedTransaction.transactionId(),
-                false));
+                disputedTransaction.transactionId()));
     }
 
     private DisputeStatus resolveDisputeStatus(DisputedTransaction disputedTransfer) {
@@ -192,8 +191,8 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private boolean isReadyForStatusCheck(Duration elapsed) {
 
-        Duration disputeStatusCheckDelay = Duration.ofMinutes(
-            this.settings.getDisputeStatusCheckDelayMinutes());
+        Duration disputeStatusCheckDelay = Duration.ofSeconds(
+            this.settings.getDisputeStatusCheckDelaySeconds());
 
         return elapsed.compareTo(disputeStatusCheckDelay) >= 0;
     }

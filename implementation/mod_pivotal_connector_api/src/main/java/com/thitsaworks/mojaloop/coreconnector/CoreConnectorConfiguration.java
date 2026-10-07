@@ -185,7 +185,7 @@ public class CoreConnectorConfiguration {
 
         private final int disputeSchedulerIntervalMinutes;
 
-        private final int disputeStatusCheckDelayMinutes;
+        private final int disputeStatusCheckDelaySeconds;
 
         public Settings() {
 
@@ -240,9 +240,9 @@ public class CoreConnectorConfiguration {
                 "disputeSchedulerIntervalMinutes",
                 1);
 
-            this.disputeStatusCheckDelayMinutes = propPositiveInt(
-                "disputeStatusCheckDelayMinutes",
-                1);
+            this.disputeStatusCheckDelaySeconds = propPositiveInt(
+                "disputeStatusCheckDelaySeconds",
+                30);
         }
 
         private static String prop(String key, String def) {
