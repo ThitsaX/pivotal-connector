@@ -18,5 +18,5 @@ package com.thitsaworks.mojaloop.coreconnector.dispute;
 
 public enum DisputeStatus {
     ACTUAL_DISPUTE,
-    SUCCESSFUL
+    FALSE_DISPUTE
 }

@@ -35,17 +35,12 @@ public class DisputeStatusStore {
 
     private final Map<String, DisputedTransaction> disputedTransactions = new ConcurrentHashMap<>();
 
-    private final Duration schedulerInterval;
-
-    public DisputeStatusStore(CoreConnectorConfiguration.Settings settings) {
-
-        this.schedulerInterval = Duration.ofMinutes(settings.getDisputeSchedulerIntervalMinutes());
-    }
+    public DisputeStatusStore() { }
 
     public void storeDisputedTransaction(String transactionId, String homeTransactionId) {
 
         if (!StringUtils.hasLength(transactionId)) {
-            LOG.info("Ignoring dispute store request because transactionId is blank.");
+            LOG.info("TransactionId of disputed transaction is blank.");
             return;
         }
 
@@ -59,22 +54,20 @@ public class DisputeStatusStore {
             transactionId, disputedTransaction);
 
         LOG.info(
-            "Dispute store requested for transactionId {}. Current disputed transaction count={}.",
+            "Disputed transaction store for transactionId {}. Current disputed transaction count={}.",
             transactionId, this.disputedTransactions.size());
 
         if (existingDisputedTransaction == null) {
 
             LOG.info(
-                "Stored transactionId {} as a disputed transaction at {}. It will be checked every {} minute(s).",
-                transactionId, disputedTransaction.disputedDateTime(),
-                this.schedulerInterval.toMinutes());
+                "Disputed transaction stored for transactionId {} at disputedDateTime {}.",
+                transactionId, disputedTransaction.disputedDateTime());
 
         } else {
 
             LOG.info(
-                "Dispute already exists for transactionId {}. It was first stored at {}. Current disputed transaction count={}.",
-                transactionId, existingDisputedTransaction.disputedDateTime(),
-                this.disputedTransactions.size());
+                "Disputed transaction already exists for transactionId {}. Current disputed transaction count={}.",
+                transactionId, this.disputedTransactions.size());
         }
     }
 

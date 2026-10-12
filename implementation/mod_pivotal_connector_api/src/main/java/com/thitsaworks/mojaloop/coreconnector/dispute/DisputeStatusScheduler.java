@@ -36,9 +36,9 @@ import java.util.concurrent.TimeUnit;
 @ConditionalOnProperty(
     name = "disputeSchedulerEnabled",
     havingValue = "true")
-public class DisputeStatusChecker implements InitializingBean, DisposableBean {
+public class DisputeStatusScheduler implements InitializingBean, DisposableBean {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusChecker.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DisputeStatusScheduler.class);
 
     private final DisputeStatusStore disputeStatusStore;
 
@@ -50,16 +50,16 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
     private final ScheduledExecutorService checker = Executors.newSingleThreadScheduledExecutor(
         r -> {
-            Thread thread = new Thread(r, "dispute-status-checker");
+            Thread thread = new Thread(r, "dispute-status-scheduler");
             thread.setDaemon(true);
             return thread;
         });
 
     @Autowired
-    public DisputeStatusChecker(DisputeStatusStore disputeStatusStore,
-                                DisputeStatusClient disputeStatusClient,
-                                AuditPublisherService auditPublisherService,
-                                CoreConnectorConfiguration.Settings settings) {
+    public DisputeStatusScheduler(DisputeStatusStore disputeStatusStore,
+                                  DisputeStatusClient disputeStatusClient,
+                                  AuditPublisherService auditPublisherService,
+                                  CoreConnectorConfiguration.Settings settings) {
 
         this.disputeStatusStore = disputeStatusStore;
         this.disputeStatusClient = disputeStatusClient;
@@ -71,7 +71,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
     public void afterPropertiesSet() {
 
         LOG.info(
-            "Starting dispute status checker with initial delay={} minute(s), check period={} minute(s).",
+            "Starting dispute status scheduler with initial delay={} minute(s), check period={} minute(s).",
             this.settings.getDisputeSchedulerIntervalMinutes(),
             this.settings.getDisputeSchedulerIntervalMinutes());
 
@@ -84,7 +84,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
     @Override
     public void destroy() {
 
-        LOG.info("Stopping dispute status checker.");
+        LOG.info("Stopping dispute status scheduler.");
 
         this.checker.shutdownNow();
     }
@@ -94,25 +94,27 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         Instant schedulerRuntime = Instant.now();
 
         LOG.info(
-            "Running dispute status check with disputed transaction count={}, schedulerRuntime={}, connectorId={}.",
+            "Running dispute status scheduler with disputed transaction count={}, schedulerRuntime={}, connectorId={}.",
             this.disputeStatusStore.getPendingDisputedTransactionCount(), schedulerRuntime, this.settings.getConnectorId());
 
         this.disputeStatusStore.getPendingDisputedTransactions().forEach(disputedTransaction -> {
 
             Duration elapsed = this.getDisputeDuration(disputedTransaction, schedulerRuntime);
 
-            LOG.info(
-                "Evaluating disputed transactionId {}, disputeElapsedDuration= {}seconds, readyForStatusCheck={}.",
-                disputedTransaction.transactionId(), elapsed.toSeconds(),
-                this.isReadyForStatusCheck(elapsed));
+            boolean isReadyForStatusApi = this.isReadyForStatusCheck(elapsed);
 
-            if (this.isReadyForStatusCheck(elapsed)) {
+            LOG.info(
+                "Evaluating dispute status for transactionId {}, disputeElapsedDuration= {}seconds, readyForStatusCheck={}.",
+                disputedTransaction.transactionId(), elapsed.toSeconds(),
+                isReadyForStatusApi);
+
+            if (isReadyForStatusApi) {
 
                 try {
                     this.checkDisputedTransaction(disputedTransaction);
                 } catch (Exception e) {
                     LOG.error(
-                        "Dispute status processing failed for transactionId {}.",
+                        "Disputed transaction status check failed for transactionId {}.",
                         disputedTransaction.transactionId(), e);
                 }
             }
@@ -128,15 +130,13 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
         DisputeStatus disputeStatus = this.resolveDisputeStatus(disputedTransaction);
 
-        this.disputeStatusStore.removeDisputedTransaction(disputedTransaction.transactionId());
-
-        boolean dispute = DisputeStatus.ACTUAL_DISPUTE.equals(disputeStatus);
+        boolean actualDispute = DisputeStatus.ACTUAL_DISPUTE.equals(disputeStatus);
 
         LOG.info(
-            "Dispute check finished for transactionId {}. finalDisputeStatus={}, dispute={}.",
-            disputedTransaction.transactionId(), disputeStatus, dispute);
+            "Disputed transaction status check finished for transactionId {}. finalDisputeStatus={}, dispute={}.",
+            disputedTransaction.transactionId(), disputeStatus, actualDispute);
 
-        if (dispute) {
+        if (actualDispute) {
 
             LOG.info(
                 "Confirmed dispute for transactionId {} because transaction status is not successful.",
@@ -152,6 +152,8 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         this.auditPublisherService.publishDisputeStatus(
             new AuditPublisherService.DisputeResultInput(
                 disputedTransaction.transactionId()));
+
+        this.disputeStatusStore.removeDisputedTransaction(disputedTransaction.transactionId());
     }
 
     private DisputeStatus resolveDisputeStatus(DisputedTransaction disputedTransfer) {
@@ -167,7 +169,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
 
             if (disputeStatus == null) {
                 LOG.info(
-                    "Dispute status check returned null for transactionId {}. Treating as actual dispute.",
+                    "Get Transaction Status returned null for transactionId {}. Treating as actual dispute.",
                     disputedTransfer.transactionId());
 
                 return DisputeStatus.ACTUAL_DISPUTE;
@@ -182,7 +184,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
         } catch (Exception e) {
 
             LOG.error(
-                "Dispute status check failed for transactionId {}. Treating as actual dispute.",
+                "Get Transaction Status failed for transactionId {}. Treating as actual dispute.",
                 disputedTransfer.transactionId(), e);
 
             return DisputeStatus.ACTUAL_DISPUTE;
@@ -201,7 +203,7 @@ public class DisputeStatusChecker implements InitializingBean, DisposableBean {
                                         Instant schedulerRuntime) {
 
         LOG.info(
-            "Getting dispute duration for transactionId {}, disputed date time {}.",
+            "Getting disputed transaction duration for transactionId {}, disputed date time {}.",
             disputedTransaction.transactionId(), disputedTransaction.disputedDateTime());
 
         return Duration.between(disputedTransaction.disputedDateTime(), schedulerRuntime);
