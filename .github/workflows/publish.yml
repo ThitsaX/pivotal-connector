@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   gitleaks:
-    uses: ./.github/workflows/gitleaks.yml
+    uses: ./.github/workflows/secret-scan.yml
     permissions:
       contents: read
 
