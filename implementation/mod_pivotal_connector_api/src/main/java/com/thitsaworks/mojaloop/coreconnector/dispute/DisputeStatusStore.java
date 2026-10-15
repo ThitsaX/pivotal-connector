@@ -16,13 +16,11 @@
 
 package com.thitsaworks.mojaloop.coreconnector.dispute;
 
-import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.Map;
