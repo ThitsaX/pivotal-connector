@@ -76,8 +76,7 @@ public class DisputeStatusScheduler implements InitializingBean, DisposableBean 
             this.settings.getDisputeSchedulerIntervalMinutes());
 
         this.checker.scheduleAtFixedRate(
-            this::checkDisputedTransaction,
-            this.settings.getDisputeSchedulerIntervalMinutes(),
+            this::checkDisputedTransaction, this.settings.getDisputeSchedulerIntervalMinutes(),
             this.settings.getDisputeSchedulerIntervalMinutes(), TimeUnit.MINUTES);
     }
 
@@ -95,7 +94,8 @@ public class DisputeStatusScheduler implements InitializingBean, DisposableBean 
 
         LOG.info(
             "Running dispute status scheduler with disputed transaction count={}, schedulerRuntime={}, connectorId={}.",
-            this.disputeStatusStore.getPendingDisputedTransactionCount(), schedulerRuntime, this.settings.getConnectorId());
+            this.disputeStatusStore.getPendingDisputedTransactionCount(), schedulerRuntime,
+            this.settings.getConnectorId());
 
         this.disputeStatusStore.getPendingDisputedTransactions().forEach(disputedTransaction -> {
 
@@ -105,8 +105,7 @@ public class DisputeStatusScheduler implements InitializingBean, DisposableBean 
 
             LOG.info(
                 "Evaluating dispute status for transactionId {}, disputeElapsedDuration= {}seconds, readyForStatusCheck={}.",
-                disputedTransaction.transactionId(), elapsed.toSeconds(),
-                isReadyForStatusApi);
+                disputedTransaction.transactionId(), elapsed.toSeconds(), isReadyForStatusApi);
 
             if (isReadyForStatusApi) {
 
@@ -142,6 +141,8 @@ public class DisputeStatusScheduler implements InitializingBean, DisposableBean 
                 "Confirmed dispute for transactionId {} because transaction status is not successful.",
                 disputedTransaction.transactionId());
 
+            this.disputeStatusStore.removeDisputedTransaction(disputedTransaction.transactionId());
+
             return;
         }
 
@@ -150,8 +151,7 @@ public class DisputeStatusScheduler implements InitializingBean, DisposableBean 
             disputedTransaction.transactionId());
 
         this.auditPublisherService.publishDisputeStatus(
-            new AuditPublisherService.DisputeResultInput(
-                disputedTransaction.transactionId()));
+            new AuditPublisherService.DisputeResultInput(disputedTransaction.transactionId()));
 
         this.disputeStatusStore.removeDisputedTransaction(disputedTransaction.transactionId());
     }
