@@ -122,6 +122,8 @@ public class CoreConnectorConfiguration {
 
         private final String quotesUrl;
 
+        private final HubCallbackFormat hubCallbackFormat;
+
         private final String transfersUrl;
 
         private final String switchId;
@@ -206,6 +208,7 @@ public class CoreConnectorConfiguration {
             this.partiesUrl = prop("fspiopPartiesUrl", outbound);
             this.quotesUrl = prop("fspiopQuotesUrl", outbound);
             this.transfersUrl = prop("fspiopTransfersUrl", outbound);
+            this.hubCallbackFormat = HubCallbackFormat.fromValue(prop("hubCallbackFormat", "FSPIOP"));
             this.switchId = prop("fspiopSwitchId", "hub");
 
             this.backendEndpoint = prop("backendEndpoint", "");
@@ -350,6 +353,20 @@ public class CoreConnectorConfiguration {
             return key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
         }
 
+    }
+
+    public enum HubCallbackFormat {
+        FSPIOP,
+        ISO20022;
+
+        public static HubCallbackFormat fromValue(String value) {
+            try {
+                return valueOf(value.trim().toUpperCase(Locale.ROOT));
+            } catch (RuntimeException err) {
+                throw new IllegalArgumentException(
+                    "hubCallbackFormat must be FSPIOP or ISO20022, but was '" + value + "'.", err);
+            }
+        }
     }
 
 }

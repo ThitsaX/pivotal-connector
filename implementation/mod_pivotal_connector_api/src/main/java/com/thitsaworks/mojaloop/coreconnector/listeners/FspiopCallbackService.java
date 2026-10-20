@@ -16,12 +16,16 @@
 package com.thitsaworks.mojaloop.coreconnector.listeners;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
 import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPutResponse;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoQuoteCallbackMapper;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -53,6 +57,8 @@ public class FspiopCallbackService {
 
     private static final String CT_TRANSFERS = "application/vnd.interoperability.transfers+json;version=2.0";
 
+    private static final String CT_ISO_JSON = "application/json";
+
     private static final Pattern TRACEPARENT = Pattern.compile("^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
 
     private static final DateTimeFormatter HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern(
@@ -64,10 +70,16 @@ public class FspiopCallbackService {
 
     private final ObjectMapper objectMapper;
 
+    private final CoreConnectorConfiguration.Settings config;
+
+    private final IsoQuoteCallbackMapper isoQuoteCallbackMapper;
+
     public FspiopCallbackService(OkHttpClient http,
                                  ObjectMapper objectMapper,
                                  FspiopJwsSigner jwsSigner,
-                                 FspiopMutualTls mutualTls) {
+                                 FspiopMutualTls mutualTls,
+                                 CoreConnectorConfiguration.Settings config,
+                                 IsoQuoteCallbackMapper isoQuoteCallbackMapper) {
 
         // Install signing and the client certificate on a derived client rather than expecting the
         // injected one to carry them. Every deployable connector overrides the framework's
@@ -77,6 +89,8 @@ public class FspiopCallbackService {
                                         .addInterceptor(jwsSigner.interceptor()))
                              .build();
         this.objectMapper = objectMapper;
+        this.config = config;
+        this.isoQuoteCallbackMapper = isoQuoteCallbackMapper;
     }
 
     public void putParties(String baseUrl,
@@ -119,8 +133,34 @@ public class FspiopCallbackService {
                           String source,
                           String destination,
                           String quoteId,
+                          QuotesPostRequest originalRequest,
                           QuotesIDPutResponse body) throws Exception {
 
+        if (config.getHubCallbackFormat() == CoreConnectorConfiguration.HubCallbackFormat.ISO20022) {
+            ObjectNode isoBody = isoQuoteCallbackMapper.toSuccess(originalRequest,
+                                                                  body,
+                                                                  quoteId,
+                                                                  destination,
+                                                                  source);
+            put(baseUrl + "/quotes/" + quoteId,
+                isoBody,
+                headers(CT_ISO_JSON, traceparent, source, destination, false));
+            return;
+        }
+        put(baseUrl + "/quotes/" + quoteId, body, headers(CT_QUOTES, traceparent, source, destination, false));
+    }
+
+    /** Retained for callers that only support the legacy FSPIOP callback contract. */
+    public void putQuotes(String baseUrl,
+                          String traceparent,
+                          String source,
+                          String destination,
+                          String quoteId,
+                          QuotesIDPutResponse body) throws Exception {
+
+        if (config.getHubCallbackFormat() == CoreConnectorConfiguration.HubCallbackFormat.ISO20022) {
+            throw new IllegalArgumentException("ISO quote callback requires the original quote request context");
+        }
         put(baseUrl + "/quotes/" + quoteId, body, headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
@@ -131,6 +171,12 @@ public class FspiopCallbackService {
                                String quoteId,
                                ErrorInformationResponse error) throws Exception {
 
+        if (config.getHubCallbackFormat() == CoreConnectorConfiguration.HubCallbackFormat.ISO20022) {
+            put(baseUrl + "/quotes/" + quoteId + "/error",
+                isoQuoteCallbackMapper.toError(error),
+                headers(CT_ISO_JSON, traceparent, source, destination, false));
+            return;
+        }
         put(baseUrl + "/quotes/" + quoteId + "/error",
             error,
             headers(CT_QUOTES, traceparent, source, destination, false));
@@ -234,7 +280,7 @@ public class FspiopCallbackService {
                                                       .string() : "";
                 log.error("PUT {} failed: HTTP {} body={}", url, response.code(), responseBody);
                 throw new IllegalStateException(
-                    "FSPIOP callback failed HTTP " + response.code() + " for " + url + ": " + responseBody);
+                    "Hub callback failed HTTP " + response.code() + " for " + url + ": " + responseBody);
             }
         }
     }
