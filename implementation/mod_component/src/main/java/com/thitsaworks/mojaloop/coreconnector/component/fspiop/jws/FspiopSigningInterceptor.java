@@ -115,8 +115,8 @@ public class FspiopSigningInterceptor implements Interceptor {
             // Null for a key held as material; the owning provider for one inside a device.
             this.keyProvider.signingProvider(),
             new FspiopProtectedHeader.Input(
-                method, uri, source, request.header(FSPIOP_DESTINATION), request.header(DATE)),
-            payload);
+                method, uri, source, request.header(FSPIOP_DESTINATION),
+                request.header(DATE)), payload);
 
         LOG.debug("Signed {} {} as '{}'", method, uri, source);
 

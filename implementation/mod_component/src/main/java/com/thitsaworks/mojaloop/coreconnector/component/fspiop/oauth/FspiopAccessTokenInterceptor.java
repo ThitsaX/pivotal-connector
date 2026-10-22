@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.oauth;
 
 import okhttp3.Interceptor;
@@ -68,9 +69,7 @@ public final class FspiopAccessTokenInterceptor implements Interceptor {
 
     private static Request withToken(Request request, String token) {
 
-        return request.newBuilder()
-                      .header(AUTHORIZATION, "Bearer " + token)
-                      .build();
+        return request.newBuilder().header(AUTHORIZATION, "Bearer " + token).build();
     }
 
 }

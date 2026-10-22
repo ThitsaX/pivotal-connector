@@ -18,8 +18,8 @@ package com.thitsaworks.mojaloop.coreconnector.jws;
 
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.FspiopSigningInterceptor;
-import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.CloudHsmJwsKeyProvider;
+import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.JwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.StaticJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key.VaultJwsKeyProvider;
 import com.thitsaworks.mojaloop.coreconnector.component.vault.Vault;
@@ -98,9 +98,7 @@ public class FspiopJwsSigner implements InitializingBean {
      */
     private JwsKeyProvider createKeyProvider() {
 
-        String provider = this.config.getKeyProvider() == null
-            ? VAULT_KV
-            : this.config.getKeyProvider().trim().toLowerCase(java.util.Locale.ROOT);
+        String provider = this.config.getKeyProvider();
 
         if (VAULT_KV.equals(provider)) {
             return new VaultJwsKeyProvider(
@@ -114,8 +112,8 @@ public class FspiopJwsSigner implements InitializingBean {
                 // This connector signs, so it needs its own crypto user. An absent path would
                 // leave it unable to log in and every callback unsigned.
                 throw new IllegalStateException(
-                    "keyProvider is 'pkcs11' but hsmCredPath is not set. Set it to the Vault path "
-                    + "holding this tenant's crypto-user credential.");
+                    "keyProvider is 'pkcs11' but hsmCredPath is not set. Set it to the Vault path " +
+                        "holding this tenant's crypto-user credential.");
             }
 
             // The setting names the custody model, not the interface. The services written in
@@ -124,13 +122,12 @@ public class FspiopJwsSigner implements InitializingBean {
             // vendor's own provider. Same profile, same key, different API.
             return new CloudHsmJwsKeyProvider(
                 this.vault, this.config.getConnectorId(),
-                this.config.getHsmCredPath(),
-                this.config.getKeyRefPathPrefix());
+                this.config.getHsmCredPath(), this.config.getKeyRefPathPrefix());
         }
 
         throw new IllegalStateException(
-            "Unrecognised keyProvider '" + this.config.getKeyProvider() + "'. Expected '"
-            + VAULT_KV + "' or '" + PKCS11 + "'.");
+            "Unrecognised keyProvider '" + this.config.getKeyProvider() + "'. Expected '" +
+                VAULT_KV + "' or '" + PKCS11 + "'.");
     }
 
     /** Install on any OkHttp client that carries outbound FSPIOP traffic. */

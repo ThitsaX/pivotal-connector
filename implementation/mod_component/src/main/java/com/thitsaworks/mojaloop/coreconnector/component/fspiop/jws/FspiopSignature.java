@@ -108,9 +108,8 @@ public final class FspiopSignature {
         String encodedPayload = encode(payload);
 
         try {
-            Signature signature = provider == null
-                ? Signature.getInstance(JCA_ALGORITHM)
-                : Signature.getInstance(JCA_ALGORITHM, provider);
+            Signature signature = provider == null ? Signature.getInstance(JCA_ALGORITHM) :
+                                      Signature.getInstance(JCA_ALGORITHM, provider);
             signature.initSign(privateKey);
             signature.update(signingInput(protectedHeader, encodedPayload));
 

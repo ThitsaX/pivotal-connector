@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.oauth;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -134,8 +135,8 @@ public final class ClientCredentialsTokenProvider {
                 // The status only. The response body is the identity provider's to word, and the
                 // request carried the client secret, so neither is repeated here.
                 throw new IOException(
-                    "Could not obtain a Hub access token for client '" + this.clientId + "' (HTTP "
-                        + response.code() + ").");
+                    "Could not obtain a Hub access token for client '" + this.clientId +
+                        "' (HTTP " + response.code() + ").");
             }
 
             ResponseBody body = response.body();
