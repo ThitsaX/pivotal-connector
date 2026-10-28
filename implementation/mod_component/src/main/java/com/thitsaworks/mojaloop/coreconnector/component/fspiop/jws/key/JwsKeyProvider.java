@@ -17,6 +17,7 @@
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key;
 
 import java.security.PrivateKey;
+import java.security.Provider;
 
 /**
  * Supplies the FSPIOP JWS signing key for the one tenant this connector fronts.
@@ -49,6 +50,19 @@ public interface JwsKeyProvider {
      *     rather than a redeploy
      */
     PrivateKey signingKey();
+
+    /**
+     * The JCA provider that owns {@link #signingKey()}, or {@code null} where the key is material
+     * this process holds.
+     * <p>
+     * Needed because a key inside a device can only be used through the provider that owns it:
+     * {@code Signature.getInstance(algorithm)} picks a provider by algorithm and returns the
+     * software one, which cannot use an opaque key. Returning {@code null} here means "any provider
+     * will do", which is true of a PEM and false of a device handle.
+     */
+    default Provider signingProvider() {
+        return null;
+    }
 
     /** Re-reads the underlying source. Called on a rotation nudge, never per request. */
     default void refresh() {

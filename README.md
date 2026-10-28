@@ -106,6 +106,17 @@ mvn clean package
 - `implementation/mod_component` - shared connector library
 - `implementation/mod_pivotal_connector_api` - Spring Boot application
 
+## Security Configuration
+
+See [FSPIOP Security Configuration](documentation/fspiop-security.md) for complete deployment guidance for:
+
+- Vault KV and AWS CloudHSM JWS signing
+- OAuth 2.0 client-credentials authentication
+- Hub-facing mutual TLS
+- Vault secret formats, certificate mounts, rotation, validation, and troubleshooting
+
+For the wallet connector's JWS, OAuth, mutual-TLS, Dockerfile, and entrypoint changes, see [ThitsaWallet Connector FSPIOP Security Configuration](documentation/wallet-connector-fspiop-security-migration.md).
+
 ## License
 
 Copyright © 2026 ThitsaWorks.

@@ -38,7 +38,7 @@ import static org.junit.Assert.assertTrue;
  * {@code fspiop-jws-vectors.json} is byte-identical to the copy the Pivotal monorepo runs
  * (<code>tests/shared/fspiop/component/vectors/</code>). Two implementations of one wire contract
  * drift silently otherwise, and the drift only shows up as a rejected signature at a peer weeks
- * later — see trust-manager-docs, hub-facing-leg.md section A6.
+ * later. Keep the two copies byte-identical.
  * <p>
  * Signatures are not pinned: RS256 over a fixed input is deterministic, but pinning one would pin a
  * key. Each implementation signs the shared inputs with its own key and verifies the round trip;
