@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.component.fspiop.jws.key;
 
 import com.thitsaworks.mojaloop.coreconnector.component.util.Pem;
@@ -69,10 +70,10 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
     }
 
     /**
-     * Loads the key. A missing secret leaves signing disabled rather than failing startup: a
-     * connector that cannot sign still processes traffic, and peers ignore signatures until they
-     * enable verification. A malformed key is a different matter and does throw — that is a
-     * misconfiguration which would otherwise surface as silent unsigned traffic.
+     * Loads the key and fails closed when the secret is missing or incomplete. Selecting this
+     * provider while JWS is enabled is an explicit requirement to sign, so silently sending
+     * unsigned callbacks would be a security downgrade. Parsing completes before the active key is
+     * replaced, leaving the last known-good key intact if a later refresh fails.
      */
     @Override
     public void refresh() {
@@ -80,11 +81,14 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
         String path = this.keyPathPrefix + "/" + this.fspId;
         Optional<JwsKeySecret> secret = this.vault.get(path, JwsKeySecret.class);
 
-        if (secret.isEmpty() || secret.get().privateKey() == null || secret.get().privateKey().isBlank()) {
-            this.signingKey = null;
-            LOG.warn("No JWS signing key at Vault path '{}'. Outbound FSPIOP callbacks will be sent unsigned.",
-                     path);
-            return;
+        if (secret.isEmpty()) {
+            throw new IllegalStateException(
+                "JWS signing key is missing at Vault path '" + path + "'.");
+        }
+
+        if (secret.get().privateKey() == null || secret.get().privateKey().isBlank()) {
+            throw new IllegalStateException("JWS signing key at Vault path '" + path +
+                                                "' must contain a non-blank privateKey.");
         }
 
         this.signingKey = Pem.readPrivateKey(secret.get().privateKey());
@@ -92,6 +96,6 @@ public class VaultJwsKeyProvider implements JwsKeyProvider {
         LOG.info("Loaded the JWS signing key for '{}' from Vault path '{}'", this.fspId, path);
     }
 
-    private record JwsKeySecret(String privateKey) { }
+    record JwsKeySecret(String privateKey) { }
 
 }
