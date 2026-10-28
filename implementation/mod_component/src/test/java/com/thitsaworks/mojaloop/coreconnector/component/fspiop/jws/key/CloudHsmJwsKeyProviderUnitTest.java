@@ -30,7 +30,7 @@ public class CloudHsmJwsKeyProviderUnitTest {
 
     private static final String CREDENTIAL_PATH = "pivotal/cloudhsm/credentials/payerfsp";
 
-    private static final String KEY_REF_PATH = "pivotal/keyref/payerfsp";
+    private static final String KEY_REF_PATH = "pivotal/keyref/payerfsp"; // gitleaks:allow
 
     @Test
     public void failsWhenTheCredentialSecretIsMissing() {
@@ -93,7 +93,8 @@ public class CloudHsmJwsKeyProviderUnitTest {
     private static CloudHsmJwsKeyProvider provider(Map<String, Object> secrets) {
 
         return new CloudHsmJwsKeyProvider(
-            new StubVault(secrets), "payerfsp", CREDENTIAL_PATH, "pivotal/keyref");
+            new StubVault(secrets), "payerfsp", CREDENTIAL_PATH,
+            "pivotal/keyref"); // gitleaks:allow
     }
 
     private static void assertRefreshFails(CloudHsmJwsKeyProvider provider, String message) {

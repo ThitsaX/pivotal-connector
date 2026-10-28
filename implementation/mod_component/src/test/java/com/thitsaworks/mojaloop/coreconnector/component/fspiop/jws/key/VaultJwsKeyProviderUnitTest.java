@@ -27,7 +27,7 @@ import static org.junit.Assert.fail;
 
 public class VaultJwsKeyProviderUnitTest {
 
-    private static final String KEY_PATH = "pivotal/jwskey/payerfsp";
+    private static final String KEY_PATH = "pivotal/jwskey/payerfsp"; // gitleaks:allow
 
     @Test
     public void failsWhenTheSigningKeySecretIsMissing() {
