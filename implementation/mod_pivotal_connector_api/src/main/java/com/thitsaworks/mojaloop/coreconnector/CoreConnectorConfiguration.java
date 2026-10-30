@@ -170,6 +170,18 @@ public class CoreConnectorConfiguration {
 
         private final String vaultServiceAccountTokenPath;
 
+        // ── Key custody ──────────────────────────────────────────────────────
+        // Where the signing key lives, and therefore where signing happens. `vault-kv` reads a PEM
+        // into memory; `pkcs11` signs inside a device and this process never holds key material.
+        // The device's own address is not configured here -- the vendor SDK carries it in its
+        // configuration file, written when the image starts.
+
+        private final String keyProvider;
+
+        private final String hsmCredPath;
+
+        private final String keyRefPathPrefix;
+
         // ── FSPIOP mutual TLS (hub-facing leg) ───────────────────────────────
         // Unlike JWS this cannot be switched on unilaterally: the peer must be listening for TLS
         // and must already trust the CA that signed this connector's certificate, so enabling it
@@ -188,6 +200,16 @@ public class CoreConnectorConfiguration {
         private final int disputeSchedulerIntervalMinutes;
 
         private final int disputeStatusCheckDelaySeconds;
+        // ── FSPIOP bearer token (hub-facing leg) ─────────────────────────────
+        // Required when callbacks go through the Hub's API gateway, which checks a token as well as
+        // the client certificate. All three or none: none means the Hub is reached where no token is
+        // checked.
+
+        private final String fspiopOauthTokenUrl;
+
+        private final String fspiopOauthClientId;
+
+        private final String fspiopOauthClientSecret;
 
         private final HubCallbackFormat hubCallbackFormat;
 
@@ -229,10 +251,18 @@ public class CoreConnectorConfiguration {
             this.vaultRole = prop("vaultRole", "");
             this.vaultKubernetesAuthPath = prop("vaultKubernetesAuthPath", "kubernetes");
             this.vaultKvMount = prop("vaultKvMount", "secret");
-            this.vaultJwsKeyPathPrefix = prop("vaultJwsKeyPathPrefix", "");
+
+            // The defaults below are Vault paths, not credentials; the scanner reads "key" in the
+            // names as a secret, so they are marked inline rather than by line in .gitleaksignore.
+            this.vaultJwsKeyPathPrefix = prop(
+                "vaultJwsKeyPathPrefix", "pivotal/jwskey"); // gitleaks:allow
             this.vaultServiceAccountTokenPath = prop(
                 "vaultServiceAccountTokenPath",
                 "/var/run/secrets/kubernetes.io/serviceaccount/token");
+
+            this.keyProvider = prop("keyProvider", "vault-kv");
+            this.hsmCredPath = prop("hsmCredPath", "");
+            this.keyRefPathPrefix = prop("keyRefPathPrefix", "pivotal/keyref"); // gitleaks:allow
 
             this.fspiopUseMutualTls = propBoolean("fspiopUseMutualTls", false);
             this.fspiopMtlsCaPath = prop("fspiopMtlsCaPath", "");
@@ -250,6 +280,44 @@ public class CoreConnectorConfiguration {
             this.hubCallbackFormat = HubCallbackFormat.fromValue(
                 (prop("hubCallbackFormat", "FSPIOP")));
 
+            this.fspiopOauthTokenUrl = prop("fspiopOauthTokenUrl", "");
+            this.fspiopOauthClientId = prop("fspiopOauthClientId", "");
+            // Also read from the environment directly. Everything else here arrives as a -D
+            // argument, which any process in the container can read from the command line; a
+            // credential should not, so the entrypoint does not pass it that way.
+            this.fspiopOauthClientSecret = prop(
+                "fspiopOauthClientSecret", envOrEmpty("FSPIOP_OAUTH_CLIENT_SECRET"));
+
+            validateJwsConfiguration();
+        }
+
+        private void validateJwsConfiguration() {
+
+            if (!this.fspiopUseJws) {
+                return;
+            }
+
+            if (!"vault-kv".equals(this.keyProvider) && !"pkcs11".equals(this.keyProvider)) {
+                throw new IllegalArgumentException("Unrecognised keyProvider '" + this.keyProvider +
+                                                       "'. Expected 'vault-kv' or 'pkcs11'.");
+            }
+
+            if ("vault-kv".equals(this.keyProvider) && this.vaultJwsKeyPathPrefix.isBlank()) {
+                throw new IllegalArgumentException(
+                    "VAULT_JWS_KEY_PATH_PREFIX is required when KEY_PROVIDER=vault-kv.");
+            }
+
+            if ("pkcs11".equals(this.keyProvider) &&
+                    (this.hsmCredPath.isBlank() || this.keyRefPathPrefix.isBlank())) {
+                throw new IllegalArgumentException(
+                    "HSM_CRED_PATH and KEY_REF_PATH_PREFIX are required when KEY_PROVIDER=pkcs11.");
+            }
+        }
+
+        private static String envOrEmpty(String name) {
+
+            String value = System.getenv(name);
+            return value == null ? "" : value;
         }
 
         private static String prop(String key, String def) {

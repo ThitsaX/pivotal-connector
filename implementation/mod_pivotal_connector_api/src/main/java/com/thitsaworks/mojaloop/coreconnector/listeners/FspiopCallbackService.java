@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.listeners;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
-import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
-import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoPartiesCallbackTranslator;
-import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoQuoteCallbackTranslator;
-import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoTransfersCallbackTranslator;
-import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPutResponse;
+import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoPartiesCallbackTranslator;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoQuoteCallbackTranslator;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoTransfersCallbackTranslator;
+import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
+import com.thitsaworks.mojaloop.coreconnector.oauth.FspiopAccessToken;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -40,7 +42,6 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -66,12 +67,14 @@ public class FspiopCallbackService {
         CT_ISO_TRANSFERS =
         "application/vnd.interoperability.iso20022.transfers+json;version=2.0";
 
-    private static final Pattern TRACEPARENT = Pattern.compile("^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
+    private static final Pattern TRACEPARENT = Pattern.compile(
+        "^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
 
-    private static final DateTimeFormatter HTTP_DATE_FORMATTER = DateTimeFormatter.ofPattern(
-                                                                                      "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
-                                                                                      Locale.US)
-                                                                                  .withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter HTTP_DATE_FORMATTER = DateTimeFormatter
+                                                                     .ofPattern(
+                                                                         "EEE, dd MMM yyyy HH:mm:ss 'GMT'",
+                                                                         Locale.US)
+                                                                     .withZone(ZoneOffset.UTC);
 
     private final OkHttpClient http;
 
@@ -89,18 +92,21 @@ public class FspiopCallbackService {
                                  ObjectMapper objectMapper,
                                  FspiopJwsSigner jwsSigner,
                                  FspiopMutualTls mutualTls,
+                                 FspiopAccessToken accessToken,
                                  CoreConnectorConfiguration.Settings config,
                                  IsoPartiesCallbackTranslator partiesTranslator,
                                  IsoQuoteCallbackTranslator quoteTranslator,
                                  IsoTransfersCallbackTranslator transfersTranslator) {
 
-        // Install signing and the client certificate on a derived client rather than expecting the
-        // injected one to carry them. Every deployable connector overrides the framework's
-        // sharedOkHttpClient bean with its own, so a pre-configured client cannot be relied on;
-        // newBuilder() shares the connection pool and dispatcher, so this costs nothing.
-        this.http = mutualTls.apply(http.newBuilder()
-                                        .addInterceptor(jwsSigner.interceptor()))
-                             .build();
+        // Install signing, the Hub token and the client certificate on a derived client rather
+        // than expecting the injected one to carry them. Every deployable connector overrides the
+        // framework's sharedOkHttpClient bean with its own, so a pre-configured client cannot be
+        // relied on; newBuilder() shares the connection pool and dispatcher, so this costs nothing.
+        this.http = mutualTls
+                        .apply(accessToken.apply(
+                            http.newBuilder().addInterceptor(jwsSigner.interceptor())))
+                        .build();
+
         this.objectMapper = objectMapper;
         this.config = config;
         this.partiesTranslator = partiesTranslator;
@@ -148,10 +154,13 @@ public class FspiopCallbackService {
         put(url, error, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
-    private String partiesUrl(String baseUrl, String partyIdType, String partyId, String subId, boolean error) {
+    private String partiesUrl(String baseUrl,
+                              String partyIdType,
+                              String partyId,
+                              String subId,
+                              boolean error) {
 
-        String
-            url =
+        String url =
             subId == null || subId.isBlank() ? baseUrl + "/parties/" + partyIdType + "/" + partyId :
                 baseUrl + "/parties/" + partyIdType + "/" + partyId + "/" + subId;
         return error ? url + "/error" : url;
@@ -275,8 +284,7 @@ public class FspiopCallbackService {
         if (value == null || value.isBlank()) {
             return false;
         }
-        return TRACEPARENT.matcher(value)
-                          .matches(); // remove the zero-rejection
+        return TRACEPARENT.matcher(value).matches(); // remove the zero-rejection
     }
 
     private void put(String url, Object body, Map<String, String> headers) throws Exception {
@@ -306,22 +314,16 @@ public class FspiopCallbackService {
             }
         };
 
-        Request.Builder
-            builder =
-            new Request.Builder().url(url)
-                                 .put(requestBody);
+        Request.Builder builder = new Request.Builder().url(url).put(requestBody);
         headers.forEach(builder::header);
 
-        try (Response response = http.newCall(builder.build())
-                                     .execute()) {
+        try (Response response = http.newCall(builder.build()).execute()) {
             if (!response.isSuccessful()) {
-                String
-                    responseBody =
-                    response.body() != null ? response.body()
-                                                      .string() : "";
+                String responseBody = response.body() != null ? response.body().string() : "";
                 log.error("PUT {} failed: HTTP {} body={}", url, response.code(), responseBody);
                 throw new IllegalStateException(
-                    "Hub callback failed HTTP " + response.code() + " for " + url + ": " + responseBody);
+                    "Hub callback failed HTTP " + response.code() + " for " + url + ": " +
+                        responseBody);
             }
         }
     }
