@@ -74,14 +74,16 @@ public class CoreConnectorConfiguration {
     public static class JwsVaultConfiguration {
 
         @Bean
-        public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+        public VaultConfiguration.Settings vaultSettings(
+            CoreConnectorConfiguration.Settings connectorSettings) {
 
             return createVaultSettings(connectorSettings);
         }
 
     }
 
-    private static VaultConfiguration.Settings createVaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+    private static VaultConfiguration.Settings createVaultSettings(
+        CoreConnectorConfiguration.Settings connectorSettings) {
 
         return new VaultConfiguration.Settings(
             connectorSettings.getVaultUrl(), connectorSettings.getVaultRole(),
@@ -209,6 +211,8 @@ public class CoreConnectorConfiguration {
 
         private final String fspiopOauthClientSecret;
 
+        private final HubCallbackFormat hubCallbackFormat;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -272,6 +276,9 @@ public class CoreConnectorConfiguration {
             this.disputeStatusCheckDelaySeconds = propPositiveInt(
                 "disputeStatusCheckDelaySeconds",
                 30);
+
+            this.hubCallbackFormat = HubCallbackFormat.fromValue(
+                (prop("hubCallbackFormat", "FSPIOP")));
 
             this.fspiopOauthTokenUrl = prop("fspiopOauthTokenUrl", "");
             this.fspiopOauthClientId = prop("fspiopOauthClientId", "");
@@ -416,6 +423,24 @@ public class CoreConnectorConfiguration {
         private static String normalizePropertyKey(String key) {
 
             return key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
+        }
+
+        public enum HubCallbackFormat {
+            FSPIOP,
+            ISO20022;
+
+            public static HubCallbackFormat fromValue(String value) {
+
+                try {
+
+                    return valueOf(value.trim().toUpperCase(Locale.ROOT));
+                } catch (RuntimeException err) {
+
+                    throw new IllegalArgumentException(
+                        "hubCallbackFormat must be FSPIOP or ISO20022, but was '" + value + "'.",
+                        err);
+                }
+            }
         }
 
     }

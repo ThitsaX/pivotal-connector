@@ -172,6 +172,7 @@ public class QuotesListener implements InitializingBean, DisposableBean {
                                connectorId,
                                msg.getPayerFsp(),
                                quoteId,
+                               request,
                                response);
 
             LOG.info("Quote Response from Payee cc to hub for TransferId {} : {}",

@@ -17,11 +17,16 @@
 package com.thitsaworks.mojaloop.coreconnector.listeners;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoPartiesCallbackTranslator;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoQuoteCallbackTranslator;
+import com.thitsaworks.mojaloop.coreconnector.mapper.iso20022.IsoTransfersCallbackTranslator;
 import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
 import com.thitsaworks.mojaloop.coreconnector.oauth.FspiopAccessToken;
 import okhttp3.MediaType;
@@ -54,6 +59,14 @@ public class FspiopCallbackService {
 
     private static final String CT_TRANSFERS = "application/vnd.interoperability.transfers+json;version=2.0";
 
+    private static final String CT_ISO_PARTIES = "application/vnd.interoperability.iso20022.parties+json;version=2.0";
+
+    private static final String CT_ISO_QUOTES = "application/vnd.interoperability.iso20022.quotes+json;version=2.0";
+
+    private static final String
+        CT_ISO_TRANSFERS =
+        "application/vnd.interoperability.iso20022.transfers+json;version=2.0";
+
     private static final Pattern TRACEPARENT = Pattern.compile(
         "^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
 
@@ -67,11 +80,23 @@ public class FspiopCallbackService {
 
     private final ObjectMapper objectMapper;
 
+    private final CoreConnectorConfiguration.Settings config;
+
+    private final IsoPartiesCallbackTranslator partiesTranslator;
+
+    private final IsoQuoteCallbackTranslator quoteTranslator;
+
+    private final IsoTransfersCallbackTranslator transfersTranslator;
+
     public FspiopCallbackService(OkHttpClient http,
                                  ObjectMapper objectMapper,
                                  FspiopJwsSigner jwsSigner,
                                  FspiopMutualTls mutualTls,
-                                 FspiopAccessToken accessToken) {
+                                 FspiopAccessToken accessToken,
+                                 CoreConnectorConfiguration.Settings config,
+                                 IsoPartiesCallbackTranslator partiesTranslator,
+                                 IsoQuoteCallbackTranslator quoteTranslator,
+                                 IsoTransfersCallbackTranslator transfersTranslator) {
 
         // Install signing, the Hub token and the client certificate on a derived client rather
         // than expecting the injected one to carry them. Every deployable connector overrides the
@@ -83,6 +108,10 @@ public class FspiopCallbackService {
                         .build();
 
         this.objectMapper = objectMapper;
+        this.config = config;
+        this.partiesTranslator = partiesTranslator;
+        this.quoteTranslator = quoteTranslator;
+        this.transfersTranslator = transfersTranslator;
     }
 
     public void putParties(String baseUrl,
@@ -95,6 +124,13 @@ public class FspiopCallbackService {
                            String subId) throws Exception {
 
         String url = partiesUrl(baseUrl, partyIdType, partyId, subId, false);
+        if (iso()) {
+
+            put(url,
+                partiesTranslator.toSuccess(body, source, destination),
+                headers(CT_ISO_PARTIES, traceparent, source, destination, true));
+            return;
+        }
         put(url, body, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
@@ -108,6 +144,13 @@ public class FspiopCallbackService {
                                 String subId) throws Exception {
 
         String url = partiesUrl(baseUrl, partyIdType, partyId, subId, true);
+        if (iso()) {
+
+            put(url,
+                partiesTranslator.toError(error, source, destination),
+                headers(CT_ISO_PARTIES, traceparent, source, destination, true));
+            return;
+        }
         put(url, error, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
@@ -130,9 +173,25 @@ public class FspiopCallbackService {
                           String quoteId,
                           QuotesIDPutResponse body) throws Exception {
 
-        put(
-            baseUrl + "/quotes/" + quoteId, body,
-            headers(CT_QUOTES, traceparent, source, destination, false));
+        putQuotes(baseUrl, traceparent, source, destination, quoteId, null, body);
+    }
+
+    public void putQuotes(String baseUrl,
+                          String traceparent,
+                          String source,
+                          String destination,
+                          String quoteId,
+                          QuotesPostRequest request,
+                          QuotesIDPutResponse body) throws Exception {
+
+        if (iso()) {
+
+            put(baseUrl + "/quotes/" + quoteId,
+                quoteTranslator.toSuccess(request, body, quoteId, destination, source),
+                headers(CT_ISO_QUOTES, traceparent, source, destination, false));
+            return;
+        }
+        put(baseUrl + "/quotes/" + quoteId, body, headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
     public void putQuotesError(String baseUrl,
@@ -142,8 +201,15 @@ public class FspiopCallbackService {
                                String quoteId,
                                ErrorInformationResponse error) throws Exception {
 
-        put(
-            baseUrl + "/quotes/" + quoteId + "/error", error,
+        if (iso()) {
+
+            put(baseUrl + "/quotes/" + quoteId + "/error",
+                quoteTranslator.toError(error),
+                headers(CT_ISO_QUOTES, traceparent, source, destination, false));
+            return;
+        }
+        put(baseUrl + "/quotes/" + quoteId + "/error",
+            error,
             headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
@@ -154,9 +220,14 @@ public class FspiopCallbackService {
                              String transferId,
                              TransfersIDPutResponse body) throws Exception {
 
-        put(
-            baseUrl + "/transfers/" + transferId, body,
-            headers(CT_TRANSFERS, traceparent, source, destination, false));
+        if (iso()) {
+
+            put(baseUrl + "/transfers/" + transferId,
+                transfersTranslator.toSuccess(body),
+                headers(CT_ISO_TRANSFERS, traceparent, source, destination, false));
+            return;
+        }
+        put(baseUrl + "/transfers/" + transferId, body, headers(CT_TRANSFERS, traceparent, source, destination, false));
     }
 
     public void putTransfersError(String baseUrl,
@@ -166,9 +237,21 @@ public class FspiopCallbackService {
                                   String transferId,
                                   ErrorInformationResponse error) throws Exception {
 
-        put(
-            baseUrl + "/transfers/" + transferId + "/error", error,
+        if (iso()) {
+
+            put(baseUrl + "/transfers/" + transferId + "/error",
+                transfersTranslator.toError(error),
+                headers(CT_ISO_TRANSFERS, traceparent, source, destination, false));
+            return;
+        }
+        put(baseUrl + "/transfers/" + transferId + "/error",
+            error,
             headers(CT_TRANSFERS, traceparent, source, destination, false));
+    }
+
+    private boolean iso() {
+
+        return config.getHubCallbackFormat() == CoreConnectorConfiguration.Settings.HubCallbackFormat.ISO20022;
     }
 
     private Map<String, String> headers(String contentType,
@@ -239,7 +322,7 @@ public class FspiopCallbackService {
                 String responseBody = response.body() != null ? response.body().string() : "";
                 log.error("PUT {} failed: HTTP {} body={}", url, response.code(), responseBody);
                 throw new IllegalStateException(
-                    "FSPIOP callback failed HTTP " + response.code() + " for " + url + ": " +
+                    "Hub callback failed HTTP " + response.code() + " for " + url + ": " +
                         responseBody);
             }
         }
