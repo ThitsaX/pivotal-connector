@@ -16,10 +16,12 @@
 package com.thitsaworks.mojaloop.coreconnector.logging;
 
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransactionRequestsPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.GetPartiesNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PatchTransfersNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostQuotesNatsMessage;
+import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostTransactionRequestsNatsMessage;
 import com.thitsaworks.mojaloop.coreconnector.payload.nats.PostTransfersNatsMessage;
 
 import java.util.Collections;
@@ -38,6 +40,11 @@ public final class MdcExtractors {
     public static Map<String, String> postQuotes(PostQuotesNatsMessage msg) {
         QuotesPostRequest request = msg != null ? msg.getRequest() : null;
         return transferId(request != null ? request.getTransactionId() : null);
+    }
+
+    public static Map<String, String> postTransactionRequests(PostTransactionRequestsNatsMessage msg) {
+        TransactionRequestsPostRequest request = msg != null ? msg.getRequest() : null;
+        return transferId(request != null ? request.getTransactionRequestId() : null);
     }
 
     public static Map<String, String> patchTransfers(PatchTransfersNatsMessage msg) {

@@ -20,6 +20,7 @@ import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForT
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.LookUp;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
+import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoRequestToPay;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -32,5 +33,7 @@ public interface FspClientService {
     ReservationForTransfer.Response doReservationForTransfer(ReservationForTransfer.Request request);
 
     ConfirmationForTransfer.Response doConfirmationForTransfer(ConfirmationForTransfer.Request request);
+
+    DoRequestToPay.Response doRequestToPay(DoRequestToPay.Request request);
 
 }
