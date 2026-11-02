@@ -18,6 +18,7 @@ package com.thitsaworks.mojaloop.coreconnector;
 
 import com.thitsaworks.mojaloop.coreconnector.component.ComponentConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultConfiguration;
+import com.thitsaworks.mojaloop.coreconnector.config.HubCallbackFormat;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import lombok.Getter;
 import okhttp3.OkHttpClient;
@@ -423,24 +424,6 @@ public class CoreConnectorConfiguration {
         private static String normalizePropertyKey(String key) {
 
             return key.replace("_", "").replace("-", "").toLowerCase(Locale.ROOT);
-        }
-
-        public enum HubCallbackFormat {
-            FSPIOP,
-            ISO20022;
-
-            public static HubCallbackFormat fromValue(String value) {
-
-                try {
-
-                    return valueOf(value.trim().toUpperCase(Locale.ROOT));
-                } catch (RuntimeException err) {
-
-                    throw new IllegalArgumentException(
-                        "hubCallbackFormat must be FSPIOP or ISO20022, but was '" + value + "'.",
-                        err);
-                }
-            }
         }
 
     }

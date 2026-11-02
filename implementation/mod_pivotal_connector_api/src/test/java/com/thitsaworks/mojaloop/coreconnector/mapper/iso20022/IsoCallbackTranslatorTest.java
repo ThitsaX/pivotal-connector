@@ -56,7 +56,7 @@ public class IsoCallbackTranslatorTest {
         PartiesTypeIDPutResponse response = new PartiesTypeIDPutResponse().party(
             person("24555500001", "Ada", "Lovelace", "payeefsp"));
 
-        JsonNode root = parties.toSuccess(response, "payeefsp", "payerfsp");
+        JsonNode root = parties.toSuccessResponse(response, "payeefsp", "payerfsp");
 
         assertTrue(root.at("/Assgnmt/MsgId").asText().matches("[0-9A-HJKMNP-TV-Z]{26}"));
         assertEquals("payeefsp", root.at("/Assgnmt/Assgnr/Agt/FinInstnId/Othr/Id").asText());
@@ -76,7 +76,7 @@ public class IsoCallbackTranslatorTest {
     @Test
     public void partiesErrorFollowsDiscoveryReversePutError() {
 
-        JsonNode root = parties.toError(error("3204", "Party not found"), "payeefsp", "payerfsp");
+        JsonNode root = parties.toErrorResponse(error("3204", "Party not found"), "payeefsp", "payerfsp");
 
         assertFalse(root.at("/Rpt/Vrfctn").asBoolean());
         assertEquals("3204", root.at("/Rpt/Rsn/Cd").asText());
@@ -96,7 +96,7 @@ public class IsoCallbackTranslatorTest {
                                            .payeeFspFee(money("0.50"))
                                            .ilpPacket("prepare-packet");
 
-        JsonNode root = quotes.toSuccess(request, response, "quote-1", "payerfsp", "payeefsp");
+        JsonNode root = quotes.toSuccessResponse(request, response, "quote-1", "payerfsp", "payeefsp");
 
         assertEquals("1", root.at("/GrpHdr/NbOfTxs").asText());
         assertEquals("CLRG", root.at("/GrpHdr/SttlmInf/SttlmMtd").asText());
@@ -127,7 +127,7 @@ public class IsoCallbackTranslatorTest {
 
         assertThrows(
             IllegalArgumentException.class,
-            () -> quotes.toSuccess(
+            () -> quotes.toSuccessResponse(
                 null, new QuotesIDPutResponse(), "quote-1", "payerfsp",
                 "payeefsp"));
     }
@@ -135,7 +135,7 @@ public class IsoCallbackTranslatorTest {
     @Test
     public void quoteErrorFollowsQuotesReversePutError() {
 
-        JsonNode root = quotes.toError(error("5100", "x".repeat(120)));
+        JsonNode root = quotes.toErrorResponse(error("5100", "x".repeat(120)));
 
         assertEquals("5100", root.at("/TxInfAndSts/StsRsnInf/Rsn/Prtry").asText());
         assertEquals(105, root.at("/TxInfAndSts/StsRsnInf/AddtlInf").asText().length());
@@ -149,7 +149,7 @@ public class IsoCallbackTranslatorTest {
                                               .completedTimestamp("2026-10-29T04:01:00.000Z")
                                               .transferState(TransferState.RESERVED);
 
-        JsonNode root = transfers.toSuccess(response);
+        JsonNode root = transfers.toSuccessResponse(response);
 
         assertEquals("fulfilment", root.at("/TxInfAndSts/ExctnConf").asText());
         assertEquals("2026-10-29T04:01:00.000Z", root.at("/TxInfAndSts/PrcgDt/DtTm").asText());
@@ -159,7 +159,7 @@ public class IsoCallbackTranslatorTest {
     @Test
     public void transferErrorFollowsTransfersReversePutError() {
 
-        JsonNode root = transfers.toError(error("4001", "Payer FSP insufficient liquidity"));
+        JsonNode root = transfers.toErrorResponse(error("4001", "Payer FSP insufficient liquidity"));
 
         assertEquals("4001", root.at("/TxInfAndSts/StsRsnInf/Rsn/Prtry").asText());
         assertEquals(

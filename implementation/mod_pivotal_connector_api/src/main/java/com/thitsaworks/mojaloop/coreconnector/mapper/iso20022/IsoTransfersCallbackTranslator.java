@@ -32,7 +32,7 @@ public class IsoTransfersCallbackTranslator {
         this.objectMapper = objectMapper;
     }
 
-    public ObjectNode toSuccess(TransfersIDPutResponse response) {
+    public ObjectNode toSuccessResponse(TransfersIDPutResponse response) {
 
         if (response == null) {
 
@@ -64,7 +64,7 @@ public class IsoTransfersCallbackTranslator {
         return root;
     }
 
-    public ObjectNode toError(ErrorInformationResponse error) {
+    public ObjectNode toErrorResponse(ErrorInformationResponse error) {
 
         ObjectNode root = objectMapper.createObjectNode();
         putGroupHeader(root);

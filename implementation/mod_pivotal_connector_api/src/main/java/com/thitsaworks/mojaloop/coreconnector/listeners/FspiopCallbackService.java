@@ -18,6 +18,7 @@ package com.thitsaworks.mojaloop.coreconnector.listeners;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
+import com.thitsaworks.mojaloop.coreconnector.config.HubCallbackFormat;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
@@ -63,9 +64,7 @@ public class FspiopCallbackService {
 
     private static final String CT_ISO_QUOTES = "application/vnd.interoperability.iso20022.quotes+json;version=2.0";
 
-    private static final String
-        CT_ISO_TRANSFERS =
-        "application/vnd.interoperability.iso20022.transfers+json;version=2.0";
+    private static final String CT_ISO_TRANSFERS = "application/vnd.interoperability.iso20022.transfers+json;version=2.0";
 
     private static final Pattern TRACEPARENT = Pattern.compile(
         "^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
@@ -88,10 +87,8 @@ public class FspiopCallbackService {
 
     private final IsoTransfersCallbackTranslator transfersTranslator;
 
-    public FspiopCallbackService(OkHttpClient http,
-                                 ObjectMapper objectMapper,
-                                 FspiopJwsSigner jwsSigner,
-                                 FspiopMutualTls mutualTls,
+    public FspiopCallbackService(OkHttpClient http, ObjectMapper objectMapper,
+                                 FspiopJwsSigner jwsSigner, FspiopMutualTls mutualTls,
                                  FspiopAccessToken accessToken,
                                  CoreConnectorConfiguration.Settings config,
                                  IsoPartiesCallbackTranslator partiesTranslator,
@@ -114,50 +111,37 @@ public class FspiopCallbackService {
         this.transfersTranslator = transfersTranslator;
     }
 
-    public void putParties(String baseUrl,
-                           String traceparent,
-                           String source,
-                           String destination,
-                           String partyIdType,
-                           String partyId,
-                           PartiesTypeIDPutResponse body,
+    public void putParties(String baseUrl, String traceparent, String source, String destination,
+                           String partyIdType, String partyId, PartiesTypeIDPutResponse body,
                            String subId) throws Exception {
 
         String url = partiesUrl(baseUrl, partyIdType, partyId, subId, false);
-        if (iso()) {
+        if (isIso()) {
 
-            put(url,
-                partiesTranslator.toSuccess(body, source, destination),
+            put(
+                url, partiesTranslator.toSuccessResponse(body, source, destination),
                 headers(CT_ISO_PARTIES, traceparent, source, destination, true));
             return;
         }
         put(url, body, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
-    public void putPartiesError(String baseUrl,
-                                String traceparent,
-                                String source,
-                                String destination,
-                                String partyIdType,
-                                String partyId,
-                                ErrorInformationResponse error,
-                                String subId) throws Exception {
+    public void putPartiesError(String baseUrl, String traceparent, String source,
+                                String destination, String partyIdType, String partyId,
+                                ErrorInformationResponse error, String subId) throws Exception {
 
         String url = partiesUrl(baseUrl, partyIdType, partyId, subId, true);
-        if (iso()) {
+        if (isIso()) {
 
-            put(url,
-                partiesTranslator.toError(error, source, destination),
+            put(
+                url, partiesTranslator.toErrorResponse(error, source, destination),
                 headers(CT_ISO_PARTIES, traceparent, source, destination, true));
             return;
         }
         put(url, error, headers(CT_PARTIES, traceparent, source, destination, true));
     }
 
-    private String partiesUrl(String baseUrl,
-                              String partyIdType,
-                              String partyId,
-                              String subId,
+    private String partiesUrl(String baseUrl, String partyIdType, String partyId, String subId,
                               boolean error) {
 
         String url =
@@ -166,99 +150,84 @@ public class FspiopCallbackService {
         return error ? url + "/error" : url;
     }
 
-    public void putQuotes(String baseUrl,
-                          String traceparent,
-                          String source,
-                          String destination,
-                          String quoteId,
-                          QuotesIDPutResponse body) throws Exception {
+    public void putQuotes(String baseUrl, String traceparent, String source, String destination,
+                          String quoteId, QuotesIDPutResponse body) throws Exception {
 
         putQuotes(baseUrl, traceparent, source, destination, quoteId, null, body);
     }
 
-    public void putQuotes(String baseUrl,
-                          String traceparent,
-                          String source,
-                          String destination,
-                          String quoteId,
-                          QuotesPostRequest request,
-                          QuotesIDPutResponse body) throws Exception {
+    public void putQuotes(String baseUrl, String traceparent, String source, String destination,
+                          String quoteId, QuotesPostRequest request, QuotesIDPutResponse body)
+        throws Exception {
 
-        if (iso()) {
+        if (isIso()) {
 
-            put(baseUrl + "/quotes/" + quoteId,
-                quoteTranslator.toSuccess(request, body, quoteId, destination, source),
+            put(
+                baseUrl + "/quotes/" + quoteId,
+                quoteTranslator.toSuccessResponse(request, body, quoteId, destination, source),
                 headers(CT_ISO_QUOTES, traceparent, source, destination, false));
             return;
         }
-        put(baseUrl + "/quotes/" + quoteId, body, headers(CT_QUOTES, traceparent, source, destination, false));
-    }
-
-    public void putQuotesError(String baseUrl,
-                               String traceparent,
-                               String source,
-                               String destination,
-                               String quoteId,
-                               ErrorInformationResponse error) throws Exception {
-
-        if (iso()) {
-
-            put(baseUrl + "/quotes/" + quoteId + "/error",
-                quoteTranslator.toError(error),
-                headers(CT_ISO_QUOTES, traceparent, source, destination, false));
-            return;
-        }
-        put(baseUrl + "/quotes/" + quoteId + "/error",
-            error,
+        put(
+            baseUrl + "/quotes/" + quoteId, body,
             headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
-    public void putTransfers(String baseUrl,
-                             String traceparent,
-                             String source,
-                             String destination,
-                             String transferId,
-                             TransfersIDPutResponse body) throws Exception {
+    public void putQuotesError(String baseUrl, String traceparent, String source,
+                               String destination, String quoteId, ErrorInformationResponse error)
+        throws Exception {
 
-        if (iso()) {
+        if (isIso()) {
 
-            put(baseUrl + "/transfers/" + transferId,
-                transfersTranslator.toSuccess(body),
-                headers(CT_ISO_TRANSFERS, traceparent, source, destination, false));
+            put(
+                baseUrl + "/quotes/" + quoteId + "/error", quoteTranslator.toErrorResponse(error),
+                headers(CT_ISO_QUOTES, traceparent, source, destination, false));
             return;
         }
-        put(baseUrl + "/transfers/" + transferId, body, headers(CT_TRANSFERS, traceparent, source, destination, false));
+        put(
+            baseUrl + "/quotes/" + quoteId + "/error", error,
+            headers(CT_QUOTES, traceparent, source, destination, false));
     }
 
-    public void putTransfersError(String baseUrl,
-                                  String traceparent,
-                                  String source,
-                                  String destination,
-                                  String transferId,
-                                  ErrorInformationResponse error) throws Exception {
+    public void putTransfers(String baseUrl, String traceparent, String source, String destination,
+                             String transferId, TransfersIDPutResponse body) throws Exception {
 
-        if (iso()) {
+        if (isIso()) {
 
-            put(baseUrl + "/transfers/" + transferId + "/error",
-                transfersTranslator.toError(error),
+            put(
+                baseUrl + "/transfers/" + transferId, transfersTranslator.toSuccessResponse(body),
                 headers(CT_ISO_TRANSFERS, traceparent, source, destination, false));
             return;
         }
-        put(baseUrl + "/transfers/" + transferId + "/error",
-            error,
+        put(
+            baseUrl + "/transfers/" + transferId, body,
             headers(CT_TRANSFERS, traceparent, source, destination, false));
     }
 
-    private boolean iso() {
+    public void putTransfersError(String baseUrl, String traceparent, String source,
+                                  String destination, String transferId,
+                                  ErrorInformationResponse error) throws Exception {
 
-        return config.getHubCallbackFormat() == CoreConnectorConfiguration.Settings.HubCallbackFormat.ISO20022;
+        if (isIso()) {
+
+            put(
+                baseUrl + "/transfers/" + transferId + "/error",
+                transfersTranslator.toErrorResponse(error),
+                headers(CT_ISO_TRANSFERS, traceparent, source, destination, false));
+            return;
+        }
+        put(
+            baseUrl + "/transfers/" + transferId + "/error", error,
+            headers(CT_TRANSFERS, traceparent, source, destination, false));
     }
 
-    private Map<String, String> headers(String contentType,
-                                        String traceparent,
-                                        String source,
-                                        String destination,
-                                        boolean includeAccept) {
+    private boolean isIso() {
+
+        return config.getHubCallbackFormat() == HubCallbackFormat.ISO20022;
+    }
+
+    private Map<String, String> headers(String contentType, String traceparent, String source,
+                                        String destination, boolean includeAccept) {
 
         Map<String, String> headers = new LinkedHashMap<>();
         headers.put("content-type", contentType);

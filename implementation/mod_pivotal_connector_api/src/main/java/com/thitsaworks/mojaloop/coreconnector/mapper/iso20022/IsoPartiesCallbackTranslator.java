@@ -32,8 +32,8 @@ public class IsoPartiesCallbackTranslator {
         this.objectMapper = objectMapper;
     }
 
-    public ObjectNode toSuccess(PartiesTypeIDPutResponse response, String source,
-                                String destination) {
+    public ObjectNode toSuccessResponse(PartiesTypeIDPutResponse response, String source,
+                                        String destination) {
 
         if (response == null || response.getParty() == null) {
 
@@ -52,7 +52,8 @@ public class IsoPartiesCallbackTranslator {
         return root;
     }
 
-    public ObjectNode toError(ErrorInformationResponse error, String source, String destination) {
+    public ObjectNode toErrorResponse(ErrorInformationResponse error, String source,
+                                      String destination) {
 
         ObjectNode root = objectMapper.createObjectNode();
         putAssignment(root, source, destination);

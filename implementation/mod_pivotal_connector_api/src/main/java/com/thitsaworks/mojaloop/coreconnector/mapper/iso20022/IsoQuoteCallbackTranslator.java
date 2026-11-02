@@ -33,7 +33,7 @@ public class IsoQuoteCallbackTranslator {
         this.objectMapper = objectMapper;
     }
 
-    public ObjectNode toSuccess(QuotesPostRequest request,
+    public ObjectNode toSuccessResponse(QuotesPostRequest request,
                                 QuotesIDPutResponse response,
                                 String quoteId,
                                 String payerFsp,
@@ -96,7 +96,7 @@ public class IsoQuoteCallbackTranslator {
         return root;
     }
 
-    public ObjectNode toError(ErrorInformationResponse error) {
+    public ObjectNode toErrorResponse(ErrorInformationResponse error) {
 
         ObjectNode root = objectMapper.createObjectNode();
 
