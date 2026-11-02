@@ -119,7 +119,9 @@ public class TransactionRequestsListener implements InitializingBean, Disposable
             DoRequestToPay.Response responseFromFsp = fspClientService.doRequestToPay(requestToFsp);
 
             if (responseFromFsp == null) {
-                throw new IllegalStateException("No response from DFSP backend");
+                throw new PostTransactionRequestException(
+                    String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYER.getStatusCode()),
+                    "No response from DFSP backend for transactionRequestId=" + transactionRequestId);
             }
             if (responseFromFsp.getError() != null && responseFromFsp.getError().getErrorInformation() != null) {
                 var errorInformation = responseFromFsp.getError().getErrorInformation();
@@ -127,7 +129,9 @@ public class TransactionRequestsListener implements InitializingBean, Disposable
                                                           errorInformation.getErrorDescription());
             }
             if (responseFromFsp.getTransactionRequestState() == null) {
-                throw new IllegalStateException("DFSP transaction request state is missing");
+                throw new PostTransactionRequestException(
+                    String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYER.getStatusCode()),
+                    "DFSP transaction request state is missing for transactionRequestId=" + transactionRequestId);
             }
 
             TransactionRequestsIDPutResponse response = new TransactionRequestsIDPutResponse()
@@ -160,7 +164,7 @@ public class TransactionRequestsListener implements InitializingBean, Disposable
     private ErrorInformationResponse toErrorResponse(Exception err, String idValue) throws JsonProcessingException {
 
         String errorCode = String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYER.getStatusCode());
-        String errorDescription = ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYER.getDefaultMessage();
+        String errorDescription = err.getMessage();
 
         if (err instanceof PostTransactionRequestException requestException) {
             errorCode = requestException.errorCode();
