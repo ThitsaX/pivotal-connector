@@ -124,6 +124,8 @@ public class CoreConnectorConfiguration {
 
         private final String transfersUrl;
 
+        private final String transactionRequestsUrl;
+
         private final String switchId;
 
         private final String backendEndpoint;
@@ -228,6 +230,7 @@ public class CoreConnectorConfiguration {
             this.partiesUrl = prop("fspiopPartiesUrl", outbound);
             this.quotesUrl = prop("fspiopQuotesUrl", outbound);
             this.transfersUrl = prop("fspiopTransfersUrl", outbound);
+            this.transactionRequestsUrl = prop("fspiopTransactionRequestsUrl", outbound);
             this.switchId = prop("fspiopSwitchId", "hub");
 
             this.backendEndpoint = prop("backendEndpoint", "");
