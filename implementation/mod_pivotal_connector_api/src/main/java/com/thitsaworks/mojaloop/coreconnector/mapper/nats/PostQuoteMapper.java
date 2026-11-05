@@ -38,24 +38,31 @@ public class PostQuoteMapper {
         Currency currency = request.getAmount().getCurrency();
 
         DoQuote.Request quoteRequestToFSP = new DoQuote.Request();
-        quoteRequestToFSP.setPayer(toFspParty(request.getPayer()));
-        quoteRequestToFSP.setPayee(toFspParty(request.getPayee()));
-        quoteRequestToFSP.setAmountType(request.getAmountType());
-        quoteRequestToFSP.setCurrency(currency);
-        quoteRequestToFSP.setAmount(request.getAmount().getAmount());
-        quoteRequestToFSP.setFeesAmount(
-            request.getFees() != null ? request.getFees().getAmount() : "0");
-        quoteRequestToFSP.setFeesCurrency(
-            request.getFees() != null ? request.getFees().getCurrency() : currency);
-        quoteRequestToFSP.setExpiration(request.getExpiration());
-        quoteRequestToFSP.setExtensionList(request.getExtensionList());
-        quoteRequestToFSP.setGeoCode(request.getGeoCode());
-        quoteRequestToFSP.setNote(request.getNote());
         quoteRequestToFSP.setQuotedId(request.getQuoteId());
         quoteRequestToFSP.setTransactionId(request.getTransactionId());
         quoteRequestToFSP.setTransactionRequestId(request.getTransactionRequestId());
 
+        quoteRequestToFSP.setPayer(toFspParty(request.getPayer()));
+        quoteRequestToFSP.setPayee(toFspParty(request.getPayee()));
+
+        quoteRequestToFSP.setAmountType(request.getAmountType());
+
+        quoteRequestToFSP.setCurrency(currency);
+        quoteRequestToFSP.setAmount(request.getAmount().getAmount());
+
+        quoteRequestToFSP.setFeesAmount(
+            request.getFees() != null ? request.getFees().getAmount() : "0");
+        quoteRequestToFSP.setFeesCurrency(
+            request.getFees() != null ? request.getFees().getCurrency() : currency);
         quoteRequestToFSP.setTransactionType(request.getTransactionType().getScenario());
+        quoteRequestToFSP.setGeoCode(request.getGeoCode());
+        quoteRequestToFSP.setNote(request.getNote());
+        quoteRequestToFSP.setExpiration(request.getExpiration());
+        quoteRequestToFSP.setExtensionList(request.getExtensionList());
+
+
+
+
         quoteRequestToFSP.setSubScenario(request.getTransactionType().getSubScenario());
 
         return quoteRequestToFSP;
