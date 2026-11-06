@@ -18,6 +18,7 @@ package com.thitsaworks.mojaloop.coreconnector;
 
 import com.thitsaworks.mojaloop.coreconnector.component.ComponentConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.component.vault.VaultConfiguration;
+import com.thitsaworks.mojaloop.coreconnector.config.HubCallbackFormat;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.Currency;
 import lombok.Getter;
 import okhttp3.OkHttpClient;
@@ -74,14 +75,16 @@ public class CoreConnectorConfiguration {
     public static class JwsVaultConfiguration {
 
         @Bean
-        public VaultConfiguration.Settings vaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+        public VaultConfiguration.Settings vaultSettings(
+            CoreConnectorConfiguration.Settings connectorSettings) {
 
             return createVaultSettings(connectorSettings);
         }
 
     }
 
-    private static VaultConfiguration.Settings createVaultSettings(CoreConnectorConfiguration.Settings connectorSettings) {
+    private static VaultConfiguration.Settings createVaultSettings(
+        CoreConnectorConfiguration.Settings connectorSettings) {
 
         return new VaultConfiguration.Settings(
             connectorSettings.getVaultUrl(), connectorSettings.getVaultRole(),
@@ -209,6 +212,8 @@ public class CoreConnectorConfiguration {
 
         private final String fspiopOauthClientSecret;
 
+        private final HubCallbackFormat hubCallbackFormat;
+
         public Settings() {
 
             this.connectorId = prop("connectorId", "dfsp");
@@ -272,6 +277,9 @@ public class CoreConnectorConfiguration {
             this.disputeStatusCheckDelaySeconds = propPositiveInt(
                 "disputeStatusCheckDelaySeconds",
                 30);
+
+            this.hubCallbackFormat = HubCallbackFormat.fromValue(
+                (prop("hubCallbackFormat", "FSPIOP")));
 
             this.fspiopOauthTokenUrl = prop("fspiopOauthTokenUrl", "");
             this.fspiopOauthClientId = prop("fspiopOauthClientId", "");
