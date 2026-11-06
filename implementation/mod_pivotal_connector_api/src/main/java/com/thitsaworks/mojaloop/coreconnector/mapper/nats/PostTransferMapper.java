@@ -52,6 +52,7 @@ public class PostTransferMapper {
             quote.setTransferAmountCurrency(agreement.transferAmount().getCurrency().toString());
             setFeeAmounts(quote, agreement.payeeFspFee(), agreement.payeeFspCommission());
             quote.setExtensionList(agreement.extensionList());
+            quote.setExpiration(transfersPostRequest.getExpiration());
         }
         request.setQuote(quote);
         request.setQuoteRequestExtensions(transfersPostRequest.getExtensionList());
