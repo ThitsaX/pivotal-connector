@@ -262,7 +262,9 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         ReservationForTransfer.Response
             response =
-            fspClientService.doReservationForTransfer(transferMapper.transferMapper(agreement, transfersPostRequest));
+            fspClientService.doReservationForTransfer(
+                transferMapper.transferMapper(agreement, transfersPostRequest),
+                transfersPostRequest);
 
         if (response == null) {
             throw new PostTransferException(String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),

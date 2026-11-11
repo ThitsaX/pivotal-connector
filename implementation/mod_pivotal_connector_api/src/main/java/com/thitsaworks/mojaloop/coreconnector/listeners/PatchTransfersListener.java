@@ -211,7 +211,8 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
 
 
-        ConfirmationForTransfer.Response response = this.fspClientService.doConfirmationForTransfer(request);
+        ConfirmationForTransfer.Response response =
+            this.fspClientService.doConfirmationForTransfer(request, msg.getResponse());
 
         if (response == null) {
             throw new PatchTransfersListener.PutTransferException(String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),
