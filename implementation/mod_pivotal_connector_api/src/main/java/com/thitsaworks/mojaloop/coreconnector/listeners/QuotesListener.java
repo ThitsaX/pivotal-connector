@@ -132,7 +132,7 @@ public class QuotesListener implements InitializingBean, DisposableBean {
             LOG.info("postQuotes quoteId={} amount={} {}", quoteId, amount, currency);
 
             DoQuote.Request quoteRequestToFsp = quotesResponseMapper.toPostQuoteRequest(request);
-            DoQuote.Response responseFromFsp = fspClientService.doQuote(quoteRequestToFsp);
+            DoQuote.Response responseFromFsp = fspClientService.doQuote(quoteRequestToFsp, request);
 
             if (responseFromFsp == null) {
                 throw new PostQuoteException(String.valueOf(ErrorCode.GENERIC_DOWNSTREAM_ERROR_PAYEE.getStatusCode()),

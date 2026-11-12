@@ -16,6 +16,9 @@
 
 package com.thitsaworks.mojaloop.coreconnector.services;
 
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesPostRequest;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPatchResponse;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersPostRequest;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForTransfer;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.LookUp;
@@ -27,10 +30,12 @@ public interface FspClientService {
 
     LookUp.Response doLookUp(LookUp.Request request);
 
-    DoQuote.Response doQuote(DoQuote.Request request);
+    DoQuote.Response doQuote(DoQuote.Request request, QuotesPostRequest quotesPostRequest);
 
-    ReservationForTransfer.Response doReservationForTransfer(ReservationForTransfer.Request request);
+    ReservationForTransfer.Response doReservationForTransfer(ReservationForTransfer.Request request,
+                                                               TransfersPostRequest transfersPostRequest);
 
-    ConfirmationForTransfer.Response doConfirmationForTransfer(ConfirmationForTransfer.Request request);
+    ConfirmationForTransfer.Response doConfirmationForTransfer(ConfirmationForTransfer.Request request,
+                                                                 TransfersIDPatchResponse transfersIDPatchResponse);
 
 }
