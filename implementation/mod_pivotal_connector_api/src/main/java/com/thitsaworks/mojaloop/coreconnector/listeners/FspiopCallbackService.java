@@ -120,7 +120,7 @@ public class FspiopCallbackService {
 
             put(
                 url, partiesTranslator.toSuccessResponse(body, source, destination),
-                headers(CT_ISO_PARTIES, traceparent, source, destination, true));
+                headers(CT_ISO_PARTIES, traceparent, source, destination, false));
             return;
         }
         put(url, body, headers(CT_PARTIES, traceparent, source, destination, true));
@@ -135,7 +135,7 @@ public class FspiopCallbackService {
 
             put(
                 url, partiesTranslator.toErrorResponse(error, source, destination),
-                headers(CT_ISO_PARTIES, traceparent, source, destination, true));
+                headers(CT_ISO_PARTIES, traceparent, source, destination, false));
             return;
         }
         put(url, error, headers(CT_PARTIES, traceparent, source, destination, true));
