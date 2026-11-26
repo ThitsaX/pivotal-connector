@@ -21,6 +21,7 @@ import com.thitsaworks.mojaloop.coreconnector.fspiop.model.ErrorInformationRespo
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.PartiesTypeIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.QuotesIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransfersIDPutResponse;
+import com.thitsaworks.mojaloop.coreconnector.fspiop.model.TransactionRequestsIDPutResponse;
 import com.thitsaworks.mojaloop.coreconnector.jws.FspiopJwsSigner;
 import com.thitsaworks.mojaloop.coreconnector.mtls.FspiopMutualTls;
 import com.thitsaworks.mojaloop.coreconnector.oauth.FspiopAccessToken;
@@ -54,6 +55,8 @@ public class FspiopCallbackService {
 
     private static final String CT_TRANSFERS = "application/vnd.interoperability.transfers+json;version=2.0";
 
+    private static final String CT_TRANSACTION_REQUESTS = "application/vnd.interoperability.transactionRequests+json;version=2.0";
+
     private static final Pattern TRACEPARENT = Pattern.compile(
         "^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$");
 
@@ -83,6 +86,26 @@ public class FspiopCallbackService {
                         .build();
 
         this.objectMapper = objectMapper;
+    }
+
+    public void putTransactionRequests(String baseUrl,
+                                       String traceparent,
+                                       String source,
+                                       String destination,
+                                       String transactionRequestId,
+                                       TransactionRequestsIDPutResponse body) throws Exception {
+        put(baseUrl.replaceAll("/+$", "") + "/transactionRequests/" + transactionRequestId, body,
+            headers(CT_TRANSACTION_REQUESTS, traceparent, source, destination, false));
+    }
+
+    public void putTransactionRequestsError(String baseUrl,
+                                            String traceparent,
+                                            String source,
+                                            String destination,
+                                            String transactionRequestId,
+                                            ErrorInformationResponse error) throws Exception {
+        put(baseUrl.replaceAll("/+$", "") + "/transactionRequests/" + transactionRequestId + "/error", error,
+            headers(CT_TRANSACTION_REQUESTS, traceparent, source, destination, false));
     }
 
     public void putParties(String baseUrl,

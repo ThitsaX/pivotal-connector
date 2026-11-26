@@ -23,6 +23,8 @@ public final class MdcContext {
 
     public static final String TRANSFER_ID = "transferId";
 
+    public static final String TRANSACTION_REQUEST_ID = "transactionRequestId";
+
     public static final String ID_VALUE = "idValue";
 
     private MdcContext() {

@@ -205,6 +205,14 @@ public class NatsService implements InitializingBean, DisposableBean {
         return buildSubject("fspiop", config.getConnectorId(), "post", "quotes");
     }
 
+    public String getTransactionRequestsSubject() {
+        return buildSubject("fspiop", config.getConnectorId(), "post", "transactionRequests");
+    }
+
+    public String getGetTransactionRequestsSubject() {
+        return buildSubject("fspiop", config.getConnectorId(), "get", "transactionRequests");
+    }
+
     public String getTransfersSubject() {
 
         return buildSubject("fspiop", config.getConnectorId(), "post", "transfers");

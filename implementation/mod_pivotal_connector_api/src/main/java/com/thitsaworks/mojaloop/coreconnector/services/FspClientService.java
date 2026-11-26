@@ -23,6 +23,8 @@ import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ConfirmationForT
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoQuote;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.LookUp;
 import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.ReservationForTransfer;
+import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.DoRequestToPay;
+import com.thitsaworks.mojaloop.coreconnector.payload.fspclient.GetRequestToPay;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,5 +39,9 @@ public interface FspClientService {
 
     ConfirmationForTransfer.Response doConfirmationForTransfer(ConfirmationForTransfer.Request request,
                                                                  TransfersIDPatchResponse transfersIDPatchResponse);
+
+    DoRequestToPay.Response doRequestToPay(DoRequestToPay.Request request);
+
+    GetRequestToPay.Response getRequestToPay(GetRequestToPay.Request request);
 
 }
