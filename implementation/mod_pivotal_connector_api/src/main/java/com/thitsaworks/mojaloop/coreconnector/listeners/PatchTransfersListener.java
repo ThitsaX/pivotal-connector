@@ -107,6 +107,7 @@ public class PatchTransfersListener implements InitializingBean, DisposableBean 
 
         listener = new NatsPullListener<>(LOG,
                                           natsService,
+                                          config,
                                           "PatchTransfers",
                                           PatchTransfersNatsMessage.class,
                                           this::handle,

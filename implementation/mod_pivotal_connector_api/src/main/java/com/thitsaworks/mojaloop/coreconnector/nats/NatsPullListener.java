@@ -13,17 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.thitsaworks.mojaloop.coreconnector.nats;
 
+import com.thitsaworks.mojaloop.coreconnector.CoreConnectorConfiguration;
 import com.thitsaworks.mojaloop.coreconnector.logging.MdcContext;
-import io.nats.client.JetStreamSubscription;
+import io.nats.client.ConsumeOptions;
+import io.nats.client.ConsumerContext;
+import io.nats.client.Dispatcher;
 import io.nats.client.Message;
+import io.nats.client.MessageConsumer;
 import org.slf4j.Logger;
 
-import java.time.Duration;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 public final class NatsPullListener<T> {
@@ -34,14 +41,6 @@ public final class NatsPullListener<T> {
         void handle(T message) throws Exception;
 
     }
-
-    private static final int BATCH_SIZE = 10;
-
-    private static final Duration FETCH_TIMEOUT = Duration.ofSeconds(5);
-
-    private static final Duration RECONNECT_WAIT = Duration.ofSeconds(1);
-
-    private static final Duration STOP_WAIT = Duration.ofSeconds(2);
 
     private final Logger log;
 
@@ -55,14 +54,24 @@ public final class NatsPullListener<T> {
 
     private final Function<T, Map<String, String>> mdcExtractor;
 
+    private final int batchSize;
+
+    // Submitting a task and shutting down the executor must be mutually exclusive.
+    private final Object lifecycle = new Object();
+
     private volatile boolean running;
 
-    private volatile Thread thread;
+    private boolean started;
 
-    private volatile JetStreamSubscription subscription;
+    private ExecutorService workers;
+
+    private Dispatcher dispatcher;
+
+    private MessageConsumer consumer;
 
     public NatsPullListener(Logger log,
                             NatsService natsService,
+                            CoreConnectorConfiguration.Settings config,
                             String operationName,
                             Class<T> messageType,
                             Handler<T> handler,
@@ -74,77 +83,102 @@ public final class NatsPullListener<T> {
         this.messageType = messageType;
         this.handler = handler;
         this.mdcExtractor = mdcExtractor != null ? mdcExtractor : ignored -> Collections.emptyMap();
+        this.batchSize = config.getNatsPullBatchSize();
     }
 
-    public void start(String subject, String stream, String durable, String threadName) {
+    public synchronized void start(String subject, String stream, String durable, String threadName) throws Exception {
 
-        running = true;
-        thread = new Thread(() -> consume(subject, stream, durable), threadName);
-        thread.setDaemon(true);
-        thread.start();
-    }
-
-    public void stop() {
-
-        running = false;
-
-        JetStreamSubscription currentSubscription = subscription;
-        if (currentSubscription != null) {
-            safeUnsubscribe(currentSubscription);
+        if (started) {
+            throw new IllegalStateException("Listener has already been started");
         }
+        started = true;
+        try {
+            synchronized (lifecycle) {
+                ConsumerContext context = natsService.consumerContext(stream, durable);
+                workers = Executors.newThreadPerTaskExecutor(
+                    Thread.ofVirtual().name(threadName + "-worker-", 1).factory());
+                dispatcher = natsService.createDispatcher();
+                running = true;
+                consumer = context.consume(ConsumeOptions.builder()
+                                                         .batchSize(batchSize)
+                                                         .build(), dispatcher, this::dispatch);
+                log.info("{} consuming '{}' with pull batch size {} using a virtual thread per message",
+                         operationName, subject, batchSize);
+            }
+        } catch (Exception err) {
+            stop();
+            throw err;
+        }
+    }
 
-        Thread currentThread = thread;
-        if (currentThread != null) {
-            currentThread.interrupt();
+    private void dispatch(Message msg) {
+
+        synchronized (lifecycle) {
+            if (!running) {
+                // Do not ack a message that shutdown prevented us from processing.
+                return;
+            }
             try {
-                currentThread.join(STOP_WAIT.toMillis());
-            } catch (InterruptedException e) {
-                Thread.currentThread()
-                      .interrupt();
+                // JetStream maxAckPending, rather than a local worker pool/semaphore,
+                // supplies the delivery budget across all pods sharing this durable.
+                workers.execute(() -> handle(msg));
+            } catch (RejectedExecutionException err) {
+                log.warn("{} executor rejected message; leaving it unacked for redelivery", operationName, err);
             }
         }
     }
 
-    private void consume(String subject, String stream, String durable) {
+    public synchronized void stop() {
 
-        while (running && !Thread.currentThread()
-                                 .isInterrupted()) {
-            JetStreamSubscription currentSubscription = null;
+        ExecutorService currentWorkers;
+        synchronized (lifecycle) {
+            running = false;
+            currentWorkers = workers;
+            if (currentWorkers != null) {
+                currentWorkers.shutdown();
+            }
+        }
+        closeConsumerAndDispatcher();
+
+        boolean interrupted = false;
+        if (currentWorkers != null) {
+            boolean finished = false;
+            while (!finished) {
+                try {
+                    finished = currentWorkers.awaitTermination(10, TimeUnit.SECONDS);
+                    if (!finished) {
+                        log.warn("{} still waiting for in-flight handlers to finish before shutdown", operationName);
+                    }
+                } catch (InterruptedException err) {
+                    interrupted = true;
+                }
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread()
+                  .interrupt();
+        }
+    }
+
+    private void closeConsumerAndDispatcher() {
+
+        if (consumer != null) {
             try {
-                currentSubscription = natsService.pullSubscribe(subject, stream, durable);
-                subscription = currentSubscription;
-                fetch(currentSubscription);
-            } catch (Exception e) {
-                if (!running || Thread.currentThread()
-                                      .isInterrupted()) {
-                    break;
-                }
-
-                if (isInactiveSubscription(e)) {
-                    log.warn("{} subscription became inactive; reconnecting", operationName);
-                } else {
-                    log.error("{} fetch loop failed: {}", operationName, e.getMessage(), e);
-                }
-
-                pauseBeforeReconnect();
+                consumer.stop();
+                consumer.close();
+            } catch (Exception err) {
+                log.warn("{} consumer close failed: {}", operationName, err.getMessage());
             } finally {
-                if (subscription == currentSubscription) {
-                    subscription = null;
-                }
-                if (currentSubscription != null) {
-                    safeUnsubscribe(currentSubscription);
-                }
+                consumer = null;
             }
         }
-    }
-
-    private void fetch(JetStreamSubscription currentSubscription) {
-
-        while (running && !Thread.currentThread()
-                                 .isInterrupted()) {
-            List<Message> messages = currentSubscription.fetch(BATCH_SIZE, FETCH_TIMEOUT);
-            for (Message msg : messages) {
-                handle(msg);
+        if (dispatcher != null) {
+            try {
+                natsService.closeDispatcher(dispatcher);
+            } catch (Exception err) {
+                log.warn("{} dispatcher close failed: {}", operationName, err.getMessage());
+            } finally {
+                dispatcher = null;
             }
         }
     }
@@ -164,32 +198,6 @@ public final class NatsPullListener<T> {
             } catch (Exception ackError) {
                 log.warn("{} message ack failed: {}", operationName, ackError.getMessage());
             }
-        }
-    }
-
-    private void pauseBeforeReconnect() {
-
-        try {
-            Thread.sleep(RECONNECT_WAIT.toMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread()
-                  .interrupt();
-        }
-    }
-
-    private boolean isInactiveSubscription(Exception e) {
-
-        return e instanceof IllegalStateException && e.getMessage() != null && e.getMessage()
-                                                                                .toLowerCase()
-                                                                                .contains("subscription is inactive");
-    }
-
-    private void safeUnsubscribe(JetStreamSubscription currentSubscription) {
-
-        try {
-            currentSubscription.unsubscribe();
-        } catch (Exception ignored) {
-            // The subscription may already be inactive during shutdown or reconnect.
         }
     }
 

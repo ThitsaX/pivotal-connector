@@ -65,8 +65,8 @@ public class PendingTransfersStore implements InitializingBean, DisposableBean {
         this.lockPrefix = connectorId + "-connector:lock:patch:";
 
         JedisPoolConfig poolConfig = new JedisPoolConfig();
-        poolConfig.setMaxTotal(10);
-        poolConfig.setMaxIdle(5);
+        poolConfig.setMaxTotal(config.getRedisPoolMaxTotal());
+        poolConfig.setMaxIdle(Math.min(5, config.getRedisPoolMaxTotal()));
         poolConfig.setMinIdle(1);
 
         this.jedisPool = new JedisPool(poolConfig, URI.create(redisUrl));

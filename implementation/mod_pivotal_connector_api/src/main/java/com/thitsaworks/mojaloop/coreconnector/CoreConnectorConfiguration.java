@@ -110,6 +110,12 @@ public class CoreConnectorConfiguration {
 
         private final String natsUrl;
 
+        private final int natsPullBatchSize;
+
+        private final int natsMaxAckPending;
+
+        private final int redisPoolMaxTotal;
+
         private final String fspiopStreamName;
 
         private final String pivotalAuditStreamName;
@@ -217,6 +223,12 @@ public class CoreConnectorConfiguration {
             this.ilpSecret = prop("connectorIlpSecret", "");
 
             this.natsUrl = prop("natsUrl", "nats://localhost:4222");
+            this.natsPullBatchSize = environmentPositiveInt("natsPullBatchSize", "NATS_PULL_BATCH_SIZE", 10);
+            if (this.natsPullBatchSize > 100) {
+                throw new IllegalArgumentException("natsPullBatchSize must be between 1 and 100.");
+            }
+            this.natsMaxAckPending = environmentPositiveInt("natsMaxAckPending", "NATS_MAX_ACK_PENDING", 200);
+            this.redisPoolMaxTotal = environmentPositiveInt("redisPoolMaxTotal", "REDIS_POOL_MAX_TOTAL", 32);
             this.fspiopStreamName = prop("fspiopStreamName", "PIVOTAL_FSPIOP");
             this.pivotalAuditStreamName = prop("pivotalAuditStreamName", "PIVOTAL_AUDIT");
             this.connectorForcePatchError = propBoolean("connectorForcePatchError", false);
@@ -360,6 +372,21 @@ public class CoreConnectorConfiguration {
 
             throw new IllegalArgumentException(
                 key + " must be a positive integer, but was '" + value + "'.");
+        }
+
+        private static int environmentPositiveInt(String key, String environmentKey, int def) {
+
+            String environmentValue = envOrEmpty(environmentKey);
+            String value = prop(key, environmentValue.isBlank() ? String.valueOf(def) : environmentValue);
+            try {
+                int parsedValue = Integer.parseInt(value);
+                if (parsedValue > 0) {
+                    return parsedValue;
+                }
+            } catch (NumberFormatException ignored) {
+                // Fail at startup rather than silently using an unexpected resource limit.
+            }
+            throw new IllegalArgumentException(key + " must be a positive integer, but was '" + value + "'.");
         }
 
         private static long propLong(String key, long def) {

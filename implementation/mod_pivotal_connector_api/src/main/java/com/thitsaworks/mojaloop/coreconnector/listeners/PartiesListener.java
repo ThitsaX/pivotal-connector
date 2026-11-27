@@ -85,6 +85,7 @@ public class PartiesListener implements InitializingBean, DisposableBean {
 
         listener = new NatsPullListener<>(LOG,
                                           natsService,
+                                          config,
                                           "GetParties",
                                           GetPartiesNatsMessage.class,
                                           data -> handle(data, connectorId),

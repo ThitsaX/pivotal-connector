@@ -90,6 +90,21 @@ public class NatsService implements InitializingBean, DisposableBean {
         return nc().jetStreamManagement();
     }
 
+    public ConsumerContext consumerContext(String stream, String durable) throws IOException, JetStreamApiException {
+
+        return nc().getConsumerContext(stream, durable);
+    }
+
+    public Dispatcher createDispatcher() {
+
+        return nc().createDispatcher();
+    }
+
+    public void closeDispatcher(Dispatcher dispatcher) {
+
+        nc().closeDispatcher(dispatcher);
+    }
+
     public String ensureStream(JetStreamManagement jsm, String subject) throws Exception {
 
         String streamName = config.getFspiopStreamName();
@@ -135,7 +150,12 @@ public class NatsService implements InitializingBean, DisposableBean {
         throws Exception {
 
         try {
-            jsm.getConsumerInfo(stream, durable);
+            ConsumerConfiguration existing = jsm.getConsumerInfo(stream, durable).getConsumerConfiguration();
+            if (existing.getMaxAckPending() != config.getNatsMaxAckPending()) {
+                jsm.updateConsumer(stream, ConsumerConfiguration.builder(existing).maxAckPending(config.getNatsMaxAckPending()).build());
+                log.info("Updated consumer '{}' on stream '{}' to maxAckPending={}",
+                         durable, stream, config.getNatsMaxAckPending());
+            }
             return;
         } catch (JetStreamApiException e) {
             if (e.getErrorCode() != 404) {
@@ -153,7 +173,7 @@ public class NatsService implements InitializingBean, DisposableBean {
                                  .replayPolicy(ReplayPolicy.Instant)
                                  .ackWait(Duration.ofSeconds(60))
                                  .maxDeliver(5)
-                                 .maxAckPending(100)
+                                 .maxAckPending(config.getNatsMaxAckPending())
                                  .build();
 
         jsm.addOrUpdateConsumer(stream, consumerConfig);
