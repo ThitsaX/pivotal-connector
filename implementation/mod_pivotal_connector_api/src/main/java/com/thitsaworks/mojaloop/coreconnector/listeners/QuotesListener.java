@@ -91,6 +91,7 @@ public class QuotesListener implements InitializingBean, DisposableBean {
 
         listener = new NatsPullListener<>(LOG,
                                           natsService,
+                                          config,
                                           "PostQuotes",
                                           PostQuotesNatsMessage.class,
                                           data -> handle(data, connectorId),

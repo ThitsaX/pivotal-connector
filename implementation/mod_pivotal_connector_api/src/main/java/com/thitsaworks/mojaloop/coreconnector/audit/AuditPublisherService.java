@@ -139,7 +139,7 @@ public class AuditPublisherService {
         }
 
         JetStreamManagement jsm = this.natsService.jetstreamManager();
-        if (!jsm.getStreamNamesBySubjectFilter(SUBJECT).isEmpty()) {
+        if (!jsm.getStreamNames(SUBJECT).isEmpty()) {
             streamResolved = true;
             return;
         }

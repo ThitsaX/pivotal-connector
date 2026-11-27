@@ -100,6 +100,7 @@ public class TransfersListener implements InitializingBean, DisposableBean {
 
         listener = new NatsPullListener<>(LOG,
                                           natsService,
+                                          config,
                                           "PostTransfers",
                                           PostTransfersNatsMessage.class,
                                           data -> handle(data, connectorId),
